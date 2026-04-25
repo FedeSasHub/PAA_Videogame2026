@@ -43,6 +43,16 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Grid Setup")
 	TSubclassOf<ATower> TowerClassToSpawn;
 
+	// --- IMPOSTAZIONI COORDINATE VISIBILI IN UNREAL ---
+	UPROPERTY(EditAnywhere, Category = "Grid | Aesthetics")
+	FColor CoordinateColor = FColor::White;
+
+	UPROPERTY(EditAnywhere, Category = "Grid | Aesthetics")
+	float CoordinateScale = 2.5f;
+
+	// Se vuoi usare un font specifico, trascinalo qui in Unreal
+	UPROPERTY(EditAnywhere, Category = "Grid | Aesthetics")
+	class UFont* CoordinateFont;
 	// La nostra mappa di celle per sapere dove sta l'acqua
 	AGridCell* GridCells[25][25];
 	int32 GetManhattanDistance(AGridCell* StartCell, AGridCell* TargetCell);

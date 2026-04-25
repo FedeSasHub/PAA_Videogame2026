@@ -6,10 +6,12 @@
 AGridCell::AGridCell()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
-	// Creiamo la mesh di base e la rendiamo la radice dell'attore
 	CellMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CellMesh"));
 	RootComponent = CellMesh;
+
+	// Portiamo la scala a 0.9 per un gap molto più netto
+	CellMesh->SetRelativeScale3D(FVector(0.9f, 0.9f, 1.0f));
+
 	CellMesh->OnClicked.AddDynamic(this, &AGridCell::OnCellClicked);
 }
 

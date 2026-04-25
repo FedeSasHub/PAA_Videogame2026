@@ -23,3 +23,20 @@ void UMatchHUD::SetStatisticheText(FString Nome, int32 HP, int32 MaxHP)
 		STATISTICHE->SetText(FText::FromString(Risultato));
 	}
 }
+
+void UMatchHUD::AggiungiMossa(FString NuovaMossa)
+{
+	if (STORICO_MOSSE)
+	{
+		// Recuperiamo quello che c'era scritto prima
+		FString TestoAttuale = STORICO_MOSSE->GetText().ToString();
+
+		// LOGICA INVERTITA:
+		// Se il testo è vuoto, scriviamo la mossa.
+		// Altrimenti, mettiamo la NuovaMossa, andiamo a capo (\n) 
+		// e poi aggiungiamo tutto il TestoAttuale vecchio.
+		FString NuovoTesto = TestoAttuale.IsEmpty() ? NuovaMossa : NuovaMossa + TEXT("\n") + TestoAttuale;
+
+		STORICO_MOSSE->SetText(FText::FromString(NuovoTesto));
+	}
+}

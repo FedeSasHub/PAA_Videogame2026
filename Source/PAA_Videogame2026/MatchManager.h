@@ -45,6 +45,7 @@ public:
 	void ClearHighlights();
 	void CheckEndTurn();
 	void CheckGameOver();
+	FString GetChessCoordinate(int32 X, int32 Y);
 	void EvaluateTowers();
 	void StartNewTurn(EPlayerTurn NewTurn);
 	void ExecuteMovement(AUnitBase* Unit, int32 TargetX, int32 TargetY, AGridCell* TargetCell);

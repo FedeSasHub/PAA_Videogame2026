@@ -19,6 +19,7 @@ protected:
 	// Questa è la funzione che scatta quando premi il tasto sinistro
 	void OnLeftClick();
 	void OnRightClick();
+	UFUNCTION(BlueprintCallable, Category = "Azioni Giocatore")
 	void OnWaitPressed();
 	virtual void BeginPlay() override;
 };

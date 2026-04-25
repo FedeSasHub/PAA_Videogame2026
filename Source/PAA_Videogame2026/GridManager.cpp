@@ -1,6 +1,7 @@
 #include "GridManager.h"
 #include "Algo/Reverse.h"
 #include "Math/UnrealMathUtility.h"
+#include "Components/TextRenderComponent.h"
 
 AGridManager::AGridManager()
 {
@@ -19,6 +20,7 @@ void AGridManager::BeginPlay()
 		return;
 	}
 
+	// Inizializziamo il seed per avere una mappa diversa a ogni avvio
 	FMath::RandInit(FDateTime::Now().GetTicks());
 	float SeedOffset = FMath::RandRange(-10000.0f, 10000.0f);
 
@@ -34,61 +36,97 @@ void AGridManager::BeginPlay()
 		for (int32 y = 0; y < 25; y++)
 		{
 			float NoiseValue = FMath::PerlinNoise2D(FVector2D(x * 0.1f + SeedOffset, y * 0.1f + SeedOffset));
-			RawNoiseValues[x * 25 + y] = NoiseValue; // Salviamo il valore per dopo
+			RawNoiseValues[x * 25 + y] = NoiseValue;
 
-			// Aggiorniamo il minimo e il massimo se troviamo un nuovo record
 			if (NoiseValue < MinNoise) MinNoise = NoiseValue;
 			if (NoiseValue > MaxNoise) MaxNoise = NoiseValue;
 		}
 	}
 
-	// --- PASSAGGIO 2: Generiamo la griglia normalizzando i valori ---
+	// --- PASSAGGIO 2: Generiamo la griglia normalizzando i valori (0-4 livelli) ---
 	for (int32 x = 0; x < 25; x++)
 	{
 		for (int32 y = 0; y < 25; y++)
 		{
 			float RawNoise = RawNoiseValues[x * 25 + y];
-
-			// Normalizziamo matematicamente il valore tra 0.0 e 1.0 
 			float NormalizedNoise = (RawNoise - MinNoise) / (MaxNoise - MinNoise);
-
-			// Moltiplichiamo per 4 e arrotondiamo per avere valori precisi tra 0 e 4
 			int32 Elevation = FMath::RoundToInt(NormalizedNoise * 4.0f);
 
-			// Calcoliamo la posizione 3D
+			// Calcoliamo la posizione 3D basata sulla tua logica originale
 			FVector SpawnLocation(y * CellSize, x * CellSize, Elevation * (CellSize * 0.5f));
 			FRotator SpawnRotation(0.0f, 0.0f, 0.0f);
 
-			// Spawniamo la cella
 			AGridCell* SpawnedCell = GetWorld()->SpawnActor<AGridCell>(CellClassToSpawn, SpawnLocation, SpawnRotation);
 
 			if (SpawnedCell)
 			{
 				SpawnedCell->SetupCell(x, y, Elevation);
-				GridCells[x][y] = SpawnedCell; // Salviamo la cella in memoria!
+				GridCells[x][y] = SpawnedCell;
 			}
 		}
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Griglia 25x25 generata con normalizzazione 0-4!"));
 
-	// --- NUOVO CODICE: PIAZZAMENTO TORRI ADATTIVO ---
+	// --- PASSAGGIO 3: PIAZZAMENTO TORRI ---
 	if (TowerClassToSpawn)
 	{
-		// Torre Centrale (Ideale: 12, 12)
-		FVector2D CenterPos = GetNearestValidTowerPosition(12, 12);
-		SpawnTowerAt(CenterPos.X, CenterPos.Y);
+		SpawnTowerAt(12, 12);
+		SpawnTowerAt(5, 12);
+		SpawnTowerAt(19, 12);
+	}
 
-		// Torre Sinistra (Ideale: 5, 12)
-		FVector2D LeftPos = GetNearestValidTowerPosition(5, 12);
-		SpawnTowerAt(LeftPos.X, LeftPos.Y);
+	// --- PASSAGGIO 4: COORDINATE VISIVE (NUMERI E LETTERE) ---
+	for (int32 i = 0; i < 25; i++)
+	{
+		// 1. NUMERI (Asse Orizzontale - In basso da sinistra a destra)
+		FVector NumLoc(-120.0f, i * CellSize, 50.0f);
+		UTextRenderComponent* NumText = NewObject<UTextRenderComponent>(this);
+		if (NumText)
+		{
+			NumText->RegisterComponent();
+			NumText->SetWorldLocation(NumLoc);
 
-		// Torre Destra (Ideale: 19, 12 - simmetrico rispetto al centro)
-		FVector2D RightPos = GetNearestValidTowerPosition(19, 12);
-		SpawnTowerAt(RightPos.X, RightPos.Y);
+			// Correzione specchio: Yaw a 180.0f
+			NumText->SetWorldRotation(FRotator(90.0f, 180.0f, 0.0f));
+
+			NumText->SetText(FText::AsNumber(i));
+			NumText->SetHorizontalAlignment(EHTA_Center);
+
+			// --- MODIFICHE VARIABILI EDITOR ---
+			NumText->SetTextRenderColor(CoordinateColor);
+			NumText->SetWorldScale3D(FVector(CoordinateScale));
+			if (CoordinateFont)
+			{
+				NumText->SetFont(CoordinateFont);
+			}
+		}
+
+		// 2. LETTERE (Asse Verticale - A sinistra dal basso all'alto)
+		// Quota Z abbassata a 10.0f per non farle fluttuare troppo
+		FVector LetLoc((i * CellSize) - (CellSize * 0.4f), -120.0f, 10.0f);
+		UTextRenderComponent* LetText = NewObject<UTextRenderComponent>(this);
+		if (LetText)
+		{
+			LetText->RegisterComponent();
+			LetText->SetWorldLocation(LetLoc);
+
+			// Correzione specchio: Yaw a 180.0f
+			LetText->SetWorldRotation(FRotator(90.0f, 180.0f, 0.0f));
+
+			TCHAR Lettera = 'A' + i;
+			LetText->SetText(FText::FromString(FString::Printf(TEXT("%c"), Lettera)));
+			LetText->SetHorizontalAlignment(EHTA_Center);
+
+			// --- MODIFICHE VARIABILI EDITOR ---
+			LetText->SetTextRenderColor(CoordinateColor);
+			LetText->SetWorldScale3D(FVector(CoordinateScale));
+			if (CoordinateFont)
+			{
+				LetText->SetFont(CoordinateFont);
+			}
+		}
 	}
 }
 
-// Implementazione dell'algoritmo di ricerca a spirale
 FVector2D AGridManager::GetNearestValidTowerPosition(int32 StartX, int32 StartY)
 {
 	int32 Radius = 0;
@@ -134,6 +172,7 @@ void AGridManager::SpawnTowerAt(int32 GridX, int32 GridY)
 		GridCells[GridX][GridY]->bIsOccupied = true;
 	}
 }
+
 TArray<AGridCell*> AGridManager::GetReachableCells(int32 StartX, int32 StartY, int32 MaxMovement)
 {
 	TArray<AGridCell*> ReachableCells;

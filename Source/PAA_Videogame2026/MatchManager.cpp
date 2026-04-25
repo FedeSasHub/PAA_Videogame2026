@@ -30,7 +30,7 @@ void AMatchManager::BeginPlay()
 		{
 			ActiveHUD->AddToViewport();
 			// Test immediato dei testi
-			ActiveHUD->SetTurnoText(TEXT("TEST CONNESSIONE OK"));
+			ActiveHUD->SetTurnoText(TEXT("IN ATTESA..."));
 			ActiveHUD->SetTorriText(10, 10);
 		}
 	}
@@ -445,7 +445,13 @@ void AMatchManager::ExecuteMovement(AUnitBase* BaseUnit, int32 X, int32 Y, AGrid
 	{
 		// 1. Liberiamo la vecchia mattonella!
 		GridMgr->GridCells[BaseUnit->GridX][BaseUnit->GridY]->bIsOccupied = false;
+		FString MoveLog = FString::Printf(TEXT("[%s] %s: %s -> %s"),
+			(CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TU") : TEXT("AI"),
+			Cast<ASniper>(BaseUnit) ? TEXT("S") : TEXT("B"),
+			*GetChessCoordinate(BaseUnit->GridX, BaseUnit->GridY),
+			*GetChessCoordinate(X, Y));
 
+		if (ActiveHUD) ActiveHUD->AggiungiMossa(MoveLog);
 		// 2. Spostiamo fisicamente l'attore (usando l'elevazione della nuova cella)
 		FVector NewLocation(Y * 100.0f, X * 100.0f, (TargetCell->ElevationLevel * 50.0f) + 100.0f);
 		BaseUnit->SetActorLocation(NewLocation);
@@ -480,6 +486,13 @@ void AMatchManager::ExecuteAttack(AUnitBase* Attacker, AUnitBase* Defender)
 	// 1. CALCOLO DEI DANNI DELL'ATTACCANTE
 	int32 Damage = FMath::RandRange(Attacker->MinDamage, Attacker->MaxDamage);
 	Defender->HealthPoints -= Damage;
+	FString AttackLog = FString::Printf(TEXT("[%s] %s: %s DMG: %d"),
+		(CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TU") : TEXT("AI"),
+		Cast<ASniper>(Attacker) ? TEXT("S") : TEXT("B"),
+		*GetChessCoordinate(Defender->GridX, Defender->GridY),
+		Damage);
+
+	if (ActiveHUD) ActiveHUD->AggiungiMossa(AttackLog);
 
 	UE_LOG(LogTemp, Warning, TEXT("BAM! %s infligge %d danni a %s! (HP Rimanenti: %d)"),
 		*Attacker->GetName(), Damage, *Defender->GetName(), Defender->HealthPoints);
@@ -776,5 +789,12 @@ void AMatchManager::CheckGameOver()
 		if (ActiveHUD) ActiveHUD->SetTurnoText(TEXT("SCONFITTA... Riprova!"));
 		UE_LOG(LogTemp, Error, TEXT("PARTITA FINITA: Vittoria AI"));
 	}
+}
+
+FString AMatchManager::GetChessCoordinate(int32 X, int32 Y)
+{
+	// Convertiamo il numero Y (0-24) nella lettera (A-Y) aggiungendo Y al codice ASCII di 'A'
+	char Lettera = 'A' + Y;
+	return FString::Printf(TEXT("%c%d"), Lettera, X);
 }
 
