@@ -50,6 +50,7 @@ public:
 	void StartNewTurn(EPlayerTurn NewTurn);
 	void ExecuteMovement(AUnitBase* Unit, int32 TargetX, int32 TargetY, AGridCell* TargetCell);
 	void ExecuteAttack(AUnitBase* Attacker, AUnitBase* Defender);
+	void AggiornaViteHUD();
 	void DeploySingleAIUnit();
 	void ExecuteAITurn();
 
@@ -76,7 +77,12 @@ public:
 
 	UPROPERTY()
 	UMatchHUD* ActiveHUD;
+protected:
+	int32 CountdownReset = 10;
+	FTimerHandle TimerHandle_Reset;
 
+	void EseguiCountdown();
+	void RestartGame();
 private:
 	int32 PlayerUnitsDeployed = 0;
 	int32 AIUnitsDeployed = 0;

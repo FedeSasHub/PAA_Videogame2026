@@ -1,5 +1,6 @@
 #include "MatchHUD.h"
 #include "Components/TextBlock.h"
+#include "Components/RichTextBlock.h" // <--- AGGIUNTO PER IL TESTO COLORATO
 
 void UMatchHUD::SetTurnoText(FString Testo)
 {
@@ -10,17 +11,8 @@ void UMatchHUD::SetTorriText(int32 Umano, int32 AI)
 {
 	if (TORRI)
 	{
-		FString Risultato = FString::Printf(TEXT("TORRI - Umano: %d | AI: %d"), Umano, AI);
+		FString Risultato = FString::Printf(TEXT("TORRI - Giocatore: %d | AI: %d"), Umano, AI);
 		TORRI->SetText(FText::FromString(Risultato));
-	}
-}
-
-void UMatchHUD::SetStatisticheText(FString Nome, int32 HP, int32 MaxHP)
-{
-	if (STATISTICHE)
-	{
-		FString Risultato = FString::Printf(TEXT("%s\nHP: %d/%d"), *Nome, HP, MaxHP);
-		STATISTICHE->SetText(FText::FromString(Risultato));
 	}
 }
 
@@ -28,15 +20,38 @@ void UMatchHUD::AggiungiMossa(FString NuovaMossa)
 {
 	if (STORICO_MOSSE)
 	{
-		// Recuperiamo quello che c'era scritto prima
-		FString TestoAttuale = STORICO_MOSSE->GetText().ToString();
+		// 1. Aggiungiamo i tag HTML-style in base a chi ha fatto la mossa
+		FString MossaFormattata = NuovaMossa;
+		if (NuovaMossa.Contains(TEXT("[TU]")))
+		{
+			MossaFormattata = FString::Printf(TEXT("<Tu>%s</>"), *NuovaMossa);
+		}
+		else if (NuovaMossa.Contains(TEXT("[AI]")))
+		{
+			MossaFormattata = FString::Printf(TEXT("<Ai>%s</>"), *NuovaMossa);
+		}
 
-		// LOGICA INVERTITA:
-		// Se il testo è vuoto, scriviamo la mossa.
-		// Altrimenti, mettiamo la NuovaMossa, andiamo a capo (\n) 
-		// e poi aggiungiamo tutto il TestoAttuale vecchio.
-		FString NuovoTesto = TestoAttuale.IsEmpty() ? NuovaMossa : NuovaMossa + TEXT("\n") + TestoAttuale;
+		// 2. Uniamo al testo esistente
+		FString TestoAttuale = STORICO_MOSSE->GetText().ToString();
+		FString NuovoTesto = TestoAttuale.IsEmpty() ? MossaFormattata : MossaFormattata + TEXT("\n") + TestoAttuale;
 
 		STORICO_MOSSE->SetText(FText::FromString(NuovoTesto));
+	}
+}
+
+// --- NUOVA FUNZIONE: Aggiorna le vite globali ---
+void UMatchHUD::AggiornaStatisticheGlobali(int32 VitaMS, int32 VitaMB, int32 VitaAS, int32 VitaAB)
+{
+	if (TXT_VitaMioSniper) TXT_VitaMioSniper->SetText(FText::FromString(FString::Printf(TEXT("[TU] Sniper: %d/20 HP"), VitaMS)));
+	if (TXT_VitaMioBrawler) TXT_VitaMioBrawler->SetText(FText::FromString(FString::Printf(TEXT("[TU] Brawler: %d/40 HP"), VitaMB)));
+	if (TXT_VitaAISniper) TXT_VitaAISniper->SetText(FText::FromString(FString::Printf(TEXT("[AI] Sniper: %d/20 HP"), VitaAS)));
+	if (TXT_VitaAIBrawler) TXT_VitaAIBrawler->SetText(FText::FromString(FString::Printf(TEXT("[AI] Brawler: %d/40 HP"), VitaAB)));
+}
+void UMatchHUD::MostraMessaggioFinale(FString Messaggio, int32 SecondiRimanenti)
+{
+	if (TURNO)
+	{
+		FString TestoCompleto = FString::Printf(TEXT("%s\nReset in %d..."), *Messaggio, SecondiRimanenti);
+		TURNO->SetText(FText::FromString(TestoCompleto));
 	}
 }

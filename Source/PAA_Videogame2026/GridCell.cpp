@@ -10,7 +10,7 @@ AGridCell::AGridCell()
 	RootComponent = CellMesh;
 
 	// Portiamo la scala a 0.9 per un gap molto più netto
-	CellMesh->SetRelativeScale3D(FVector(0.9f, 0.9f, 1.0f));
+	CellMesh->SetRelativeScale3D(FVector(0.95f, 0.95f, 1.0f));
 
 	CellMesh->OnClicked.AddDynamic(this, &AGridCell::OnCellClicked);
 }

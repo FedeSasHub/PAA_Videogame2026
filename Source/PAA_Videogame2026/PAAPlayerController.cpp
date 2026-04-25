@@ -1,6 +1,7 @@
 #include "PAAPlayerController.h"
 #include "MatchManager.h" 
 #include "UnitBase.h"
+#include "MatchHUD.h"
 #include "GridCell.h"
 #include "Engine/World.h"
 #include "EngineUtils.h" // <--- AGGIUNTO: Necessario per TActorIterator!
@@ -102,21 +103,39 @@ void APAAPlayerController::BeginPlay()
 
 void APAAPlayerController::OnWaitPressed()
 {
-	AMatchManager* MM = nullptr;
-	for (TActorIterator<AMatchManager> It(GetWorld()); It; ++It) { MM = *It; break; }
-
-	if (MM && MM->SelectedUnit)
+	// 1. Troviamo il MatchManager nel mondo
+	AMatchManager* FoundMatchManager = nullptr;
+	for (TActorIterator<AMatchManager> It(GetWorld()); It; ++It)
 	{
-		AUnitBase* Unit = Cast<AUnitBase>(MM->SelectedUnit);
-		if (Unit && Unit->ActorHasTag("PlayerUnit"))
-		{
-			UE_LOG(LogTemp, Warning, TEXT("L'unita aspetta. Turno terminato per lei."));
-			Unit->bHasMovedThisTurn = true;
-			Unit->bHasAttackedThisTurn = true;
+		FoundMatchManager = *It;
+		break;
+	}
 
-			// Opzionale: cambia colore per indicare che è esausta
-			MM->ClearHighlights();
-			MM->CheckEndTurn();
+	// 2. Se l'abbiamo trovato e abbiamo un'unità selezionata
+	if (FoundMatchManager && FoundMatchManager->SelectedUnit)
+	{
+		// --- REQUISITO 9: LOG WAIT ---
+		FString UnitType = FoundMatchManager->SelectedUnit->GetName().Contains(TEXT("Sniper")) ? TEXT("S") : TEXT("B");
+
+		FString WaitLog = FString::Printf(TEXT("[TU] %s: Resta in attesa"), *UnitType);
+
+		if (FoundMatchManager->ActiveHUD)
+		{
+			FoundMatchManager->ActiveHUD->AggiungiMossa(WaitLog);
 		}
+
+		// --- CORREZIONE: Facciamo il Cast a UnitBase per accedere alle variabili ---
+		AUnitBase* UnitBasePtr = Cast<AUnitBase>(FoundMatchManager->SelectedUnit);
+		if (UnitBasePtr)
+		{
+			// 3. Disattiviamo l'unità
+			UnitBasePtr->bHasMovedThisTurn = true;
+			UnitBasePtr->bHasAttackedThisTurn = true;
+		}
+
+		// 4. Passiamo il turno
+		FoundMatchManager->ClearHighlights();
+		FoundMatchManager->SelectedUnit = nullptr;
+		FoundMatchManager->CheckEndTurn();
 	}
 }
