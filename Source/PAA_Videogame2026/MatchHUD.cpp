@@ -1,69 +1,72 @@
+// matchhud gestisce l'interfaccia a schermo del giocatore. 
+// si occupa di aggiornare i testi, i contatori vitali e lo storico mosse durante la partita.
+
 #include "MatchHUD.h"
 #include "Components/TextBlock.h"
-#include "Components/RichTextBlock.h" // <--- AGGIUNTO PER IL TESTO COLORATO
+#include "Components/RichTextBlock.h"
 
-void UMatchHUD::SetTurnoText(FString Testo)
+// aggiorna il testo in alto al centro che indica di chi e' il turno
+void UMatchHUD::SetTurnText(FString Text)
 {
-	if (TURNO) TURNO->SetText(FText::FromString(Testo));
+	if (TURNO) TURNO->SetText(FText::FromString(Text));
 }
 
-void UMatchHUD::SetTorriText(int32 Umano, int32 AI)
+// aggiorna il contatore in alto a sinistra con le torri possedute
+void UMatchHUD::SetTowersText(int32 Human, int32 AI)
 {
 	if (TORRI)
 	{
-		FString Risultato = FString::Printf(TEXT("TORRI - Giocatore: %d | AI: %d"), Umano, AI);
-		TORRI->SetText(FText::FromString(Risultato));
+		FString Result = FString::Printf(TEXT("TORRI - Giocatore: %d | AI: %d"), Human, AI);
+		TORRI->SetText(FText::FromString(Result));
 	}
 }
 
-void UMatchHUD::AggiungiMossa(FString NuovaMossa)
+// aggiorna la vita di tutte le pedine nel pannello laterale
+void UMatchHUD::UpdateGlobalStats(int32 HumanSniperHP, int32 HumanBrawlerHP, int32 AISniperHP, int32 AIBrawlerHP)
+{
+	if (TXT_VitaMioSniper) TXT_VitaMioSniper->SetText(FText::FromString(FString::Printf(TEXT("[TU] Sniper: %d/20 HP"), HumanSniperHP)));
+	if (TXT_VitaMioBrawler) TXT_VitaMioBrawler->SetText(FText::FromString(FString::Printf(TEXT("[TU] Brawler: %d/40 HP"), HumanBrawlerHP)));
+	if (TXT_VitaAISniper) TXT_VitaAISniper->SetText(FText::FromString(FString::Printf(TEXT("[AI] Sniper: %d/20 HP"), AISniperHP)));
+	if (TXT_VitaAIBrawler) TXT_VitaAIBrawler->SetText(FText::FromString(FString::Printf(TEXT("[AI] Brawler: %d/40 HP"), AIBrawlerHP)));
+}
+
+// aggiunge una nuova riga colorata allo storico delle mosse e scala sotto le altre
+void UMatchHUD::AddMoveToHistory(FString NewMove)
 {
 	if (STORICO_MOSSE)
 	{
-		// 1. Aggiungiamo i tag HTML-style in base a chi ha fatto la mossa
-		FString MossaFormattata = NuovaMossa;
-		if (NuovaMossa.Contains(TEXT("[TU]")))
+		FString FormattedMove = NewMove;
+		if (NewMove.Contains(TEXT("[TU]")))
 		{
-			MossaFormattata = FString::Printf(TEXT("<Tu>%s</>"), *NuovaMossa);
+			FormattedMove = FString::Printf(TEXT("<Tu>%s</>"), *NewMove);
 		}
-		else if (NuovaMossa.Contains(TEXT("[AI]")))
+		else if (NewMove.Contains(TEXT("[AI]")))
 		{
-			MossaFormattata = FString::Printf(TEXT("<Ai>%s</>"), *NuovaMossa);
+			FormattedMove = FString::Printf(TEXT("<Ai>%s</>"), *NewMove);
 		}
 
-		// 2. Uniamo al testo esistente
-		FString TestoAttuale = STORICO_MOSSE->GetText().ToString();
-		FString NuovoTesto = TestoAttuale.IsEmpty() ? MossaFormattata : MossaFormattata + TEXT("\n") + TestoAttuale;
+		FString CurrentText = STORICO_MOSSE->GetText().ToString();
+		FString NewText = CurrentText.IsEmpty() ? FormattedMove : FormattedMove + TEXT("\n") + CurrentText;
 
-		STORICO_MOSSE->SetText(FText::FromString(NuovoTesto));
+		STORICO_MOSSE->SetText(FText::FromString(NewText));
 	}
 }
 
-// --- NUOVA FUNZIONE: Aggiorna le vite globali ---
-void UMatchHUD::AggiornaStatisticheGlobali(int32 VitaMS, int32 VitaMB, int32 VitaAS, int32 VitaAB)
+// trasforma il turno in countdown e mostra l'esito a fine partita
+void UMatchHUD::ShowFinalMessage(FString Message, int32 SecondsRemaining)
 {
-	if (TXT_VitaMioSniper) TXT_VitaMioSniper->SetText(FText::FromString(FString::Printf(TEXT("[TU] Sniper: %d/20 HP"), VitaMS)));
-	if (TXT_VitaMioBrawler) TXT_VitaMioBrawler->SetText(FText::FromString(FString::Printf(TEXT("[TU] Brawler: %d/40 HP"), VitaMB)));
-	if (TXT_VitaAISniper) TXT_VitaAISniper->SetText(FText::FromString(FString::Printf(TEXT("[AI] Sniper: %d/20 HP"), VitaAS)));
-	if (TXT_VitaAIBrawler) TXT_VitaAIBrawler->SetText(FText::FromString(FString::Printf(TEXT("[AI] Brawler: %d/40 HP"), VitaAB)));
-}
-void UMatchHUD::MostraMessaggioFinale(FString Messaggio, int32 SecondiRimanenti)
-{
-	// Aggiorniamo il testo del turno come countdown (piccolo in alto)
 	if (TURNO)
 	{
-		FString TestoCountdown = FString::Printf(TEXT("Reset in %d..."), SecondiRimanenti);
-		TURNO->SetText(FText::FromString(TestoCountdown));
+		FString CountdownText = FString::Printf(TEXT("Reset in %d..."), SecondsRemaining);
+		TURNO->SetText(FText::FromString(CountdownText));
 	}
 
-	// Mostriamo il messaggio GIGANTE al centro
 	if (TXT_MessaggioCentrale)
 	{
-		TXT_MessaggioCentrale->SetText(FText::FromString(Messaggio));
+		TXT_MessaggioCentrale->SetText(FText::FromString(Message));
 		TXT_MessaggioCentrale->SetVisibility(ESlateVisibility::Visible);
 
-		// Colore dinamico: Oro per vittoria, Rosso scuro per sconfitta
-		FLinearColor ColoreTesto = Messaggio.Contains(TEXT("VITTORIA")) ? FLinearColor(1.f, 0.8f, 0.1f) : FLinearColor(0.5f, 0.f, 0.f);
-		TXT_MessaggioCentrale->SetColorAndOpacity(FSlateColor(ColoreTesto));
+		FLinearColor TextColor = Message.Contains(TEXT("VITTORIA")) ? FLinearColor(1.f, 0.8f, 0.1f) : FLinearColor(0.5f, 0.f, 0.f);
+		TXT_MessaggioCentrale->SetColorAndOpacity(FSlateColor(TextColor));
 	}
 }

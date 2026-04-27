@@ -12,6 +12,5 @@ class PAA_VIDEOGAME2026_API ASniper : public AUnitBase
 public:
 	ASniper();
 
-	// Polimorfismo: modifichiamo il comportamento della funzione base
 	virtual void PrintUnitStatus() override;
 };

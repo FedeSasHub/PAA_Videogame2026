@@ -4,9 +4,10 @@
 #include "MatchHUD.h"
 #include "GridCell.h"
 #include "Engine/World.h"
-#include "EngineUtils.h" // <--- AGGIUNTO: Necessario per TActorIterator!
+#include "EngineUtils.h"
 #include "Kismet/GameplayStatics.h"
 
+// abilita il cursore e gli eventi di interazione del mouse
 APAAPlayerController::APAAPlayerController()
 {
 	bShowMouseCursor = true;
@@ -14,6 +15,7 @@ APAAPlayerController::APAAPlayerController()
 	bEnableMouseOverEvents = true;
 }
 
+// collega le azioni mappate nell'editor alle funzioni del codice
 void APAAPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
@@ -22,6 +24,18 @@ void APAAPlayerController::SetupInputComponent()
 	InputComponent->BindAction("WaitAction", IE_Pressed, this, &APAAPlayerController::OnWaitPressed);
 }
 
+// impedisce al mouse di bloccarsi nella finestra di gioco permettendo di cliccare l'interfaccia
+void APAAPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+}
+
+// cattura il clic sinistro e lo trasmette al match manager per selezionare celle o pedine
 void APAAPlayerController::OnLeftClick()
 {
 	FHitResult Hit;
@@ -32,7 +46,6 @@ void APAAPlayerController::OnLeftClick()
 		AActor* HitActor = Hit.GetActor();
 		if (!HitActor) return;
 
-		// 1. Controllo se è una cella
 		AGridCell* ClickedCell = Cast<AGridCell>(HitActor);
 		if (ClickedCell)
 		{
@@ -42,16 +55,10 @@ void APAAPlayerController::OnLeftClick()
 				break;
 			}
 		}
-		// 2. Controllo se è un'unità (Qualsiasi fazione)
-		// Usiamo l'operatore || (OR) per includere anche i nemici
 		else if (HitActor->ActorHasTag(FName("PlayerUnit")) || HitActor->ActorHasTag(FName("EnemyUnit")))
 		{
-			UE_LOG(LogTemp, Warning, TEXT("LineTrace: Unità cliccata! (Tag: %s)"), *HitActor->Tags[0].ToString());
-
 			for (TActorIterator<AMatchManager> It(GetWorld()); It; ++It)
 			{
-				// Invece di filtrare qui, passiamo l'unità al MatchManager
-				// Sarà lui a decidere se mostrarne solo le info o permettere il movimento
 				It->OnUnitClicked(HitActor);
 				break;
 			}
@@ -59,6 +66,7 @@ void APAAPlayerController::OnLeftClick()
 	}
 }
 
+// cattura il clic destro per inviare ordini di movimento o attacco
 void APAAPlayerController::OnRightClick()
 {
 	FHitResult Hit;
@@ -69,7 +77,6 @@ void APAAPlayerController::OnRightClick()
 		AGridCell* ClickedCell = Cast<AGridCell>(Hit.GetActor());
 		AUnitBase* ClickedUnit = Cast<AUnitBase>(Hit.GetActor());
 
-		// AGGIUNTO: Dobbiamo prima trovare il MatchManager nel mondo!
 		AMatchManager* FoundMatchManager = nullptr;
 		for (TActorIterator<AMatchManager> It(GetWorld()); It; ++It)
 		{
@@ -91,19 +98,9 @@ void APAAPlayerController::OnRightClick()
 	}
 }
 
-void APAAPlayerController::BeginPlay()
-{
-	Super::BeginPlay();
-
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputMode);
-}
-
+// fa terminare forzatamente il turno alla pedina selezionata in quel momento
 void APAAPlayerController::OnWaitPressed()
 {
-	// 1. Troviamo il MatchManager nel mondo
 	AMatchManager* FoundMatchManager = nullptr;
 	for (TActorIterator<AMatchManager> It(GetWorld()); It; ++It)
 	{
@@ -111,29 +108,23 @@ void APAAPlayerController::OnWaitPressed()
 		break;
 	}
 
-	// 2. Se l'abbiamo trovato e abbiamo un'unità selezionata
 	if (FoundMatchManager && FoundMatchManager->SelectedUnit)
 	{
-		// --- REQUISITO 9: LOG WAIT ---
 		FString UnitType = FoundMatchManager->SelectedUnit->GetName().Contains(TEXT("Sniper")) ? TEXT("S") : TEXT("B");
-
 		FString WaitLog = FString::Printf(TEXT("[TU] %s: Resta in attesa"), *UnitType);
 
 		if (FoundMatchManager->ActiveHUD)
 		{
-			FoundMatchManager->ActiveHUD->AggiungiMossa(WaitLog);
+			FoundMatchManager->ActiveHUD->AddMoveToHistory(WaitLog);
 		}
 
-		// --- CORREZIONE: Facciamo il Cast a UnitBase per accedere alle variabili ---
 		AUnitBase* UnitBasePtr = Cast<AUnitBase>(FoundMatchManager->SelectedUnit);
 		if (UnitBasePtr)
 		{
-			// 3. Disattiviamo l'unità
 			UnitBasePtr->bHasMovedThisTurn = true;
 			UnitBasePtr->bHasAttackedThisTurn = true;
 		}
 
-		// 4. Passiamo il turno
 		FoundMatchManager->ClearHighlights();
 		FoundMatchManager->SelectedUnit = nullptr;
 		FoundMatchManager->CheckEndTurn();

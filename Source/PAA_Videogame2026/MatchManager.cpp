@@ -1,5 +1,5 @@
 #include "MatchManager.h"
-#include "GridManager.h"          // <--- QUESTO È QUELLO CHE FA CRASHARE IL COMPILATORE SE MANCA
+#include "GridManager.h"          
 #include "Math/UnrealMathUtility.h"
 #include "Sniper.h"
 #include "Brawler.h"
@@ -14,31 +14,35 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
+
 AMatchManager::AMatchManager()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	CurrentPhase = EMatchPhase::CoinFlip;
 }
 
+// inizializza l'interfaccia a schermo e avvia il timer per il lancio della moneta
 void AMatchManager::BeginPlay()
 {
 	Super::BeginPlay();
 	FMath::RandInit(FDateTime::Now().GetTicks());
+
 	if (HUDClass)
 	{
 		ActiveHUD = CreateWidget<UMatchHUD>(GetWorld(), HUDClass);
 		if (ActiveHUD)
 		{
 			ActiveHUD->AddToViewport();
-			// Test immediato dei testi
-			ActiveHUD->SetTurnoText(TEXT("IN ATTESA..."));
-			ActiveHUD->SetTorriText(0,0);
+			ActiveHUD->SetTurnText(TEXT("IN ATTESA..."));
+			ActiveHUD->SetTowersText(0, 0);
 		}
 	}
+
 	FTimerHandle TimerHandle;
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AMatchManager::FlipCoin, 1.0f, false);
 }
 
+// decide casualmente chi avra il diritto di schierare la prima pedina
 void AMatchManager::FlipCoin()
 {
 	bool bHumanWinsFlip = FMath::RandBool();
@@ -46,13 +50,13 @@ void AMatchManager::FlipCoin()
 
 	if (bHumanWinsFlip)
 	{
-		FirstPlayer = EPlayerTurn::HumanPlayer; // <--- SALVIAMO IL VINCITORE
+		FirstPlayer = EPlayerTurn::HumanPlayer;
 		CurrentTurn = EPlayerTurn::HumanPlayer;
 		UE_LOG(LogTemp, Warning, TEXT("TESTA! Inizi tu a schierare la prima unita."));
 	}
 	else
 	{
-		FirstPlayer = EPlayerTurn::AIPlayer;   // <--- SALVIAMO IL VINCITORE
+		FirstPlayer = EPlayerTurn::AIPlayer;
 		CurrentTurn = EPlayerTurn::AIPlayer;
 		UE_LOG(LogTemp, Warning, TEXT("CROCE! Inizia l'AI."));
 		DeploySingleAIUnit();
@@ -60,9 +64,62 @@ void AMatchManager::FlipCoin()
 	}
 }
 
+// cerca una cella di terra ferma e posiziona automaticamente un'unita nemica
+void AMatchManager::DeploySingleAIUnit()
+{
+	int32 RandX, RandY;
+	bool bValidLocation = false;
+	int32 Attempts = 0;
+
+	while (!bValidLocation && Attempts < 50)
+	{
+		RandX = FMath::RandRange(0, 24);
+		RandY = FMath::RandRange(22, 24);
+		Attempts++;
+
+		for (TActorIterator<AGridCell> It(GetWorld()); It; ++It)
+		{
+			if (It->GridPosition.X == RandX && It->GridPosition.Y == RandY)
+			{
+				if (It->ElevationLevel > 0)
+				{
+					bValidLocation = true;
+					FVector AISpawnLoc(RandY * 100.0f, RandX * 100.0f, (It->ElevationLevel * 50.0f) + 100.0f);
+					TSubclassOf<AActor> AIUnitToSpawn = (AIUnitsDeployed == 0) ? TSubclassOf<AActor>(SniperClass) : TSubclassOf<AActor>(BrawlerClass);
+
+					if (AIUnitToSpawn)
+					{
+						AActor* SpawnedAIUnit = GetWorld()->SpawnActor<AActor>(AIUnitToSpawn, AISpawnLoc, FRotator(0, 180, 0));
+						if (SpawnedAIUnit)
+						{
+							SetUnitColor(SpawnedAIUnit, FLinearColor(0.5f, 0.0f, 0.2f));
+							SpawnedAIUnit->Tags.Add(FName("EnemyUnit"));
+
+							AUnitBase* BaseAIUnit = Cast<AUnitBase>(SpawnedAIUnit);
+							if (BaseAIUnit)
+							{
+								BaseAIUnit->GridX = RandX;
+								BaseAIUnit->GridY = RandY;
+								BaseAIUnit->OriginalGridX = RandX;
+								BaseAIUnit->OriginalGridY = RandY;
+								BaseAIUnit->MaxHealthPoints = BaseAIUnit->HealthPoints;
+							}
+							AIUnitsDeployed++;
+							UE_LOG(LogTemp, Warning, TEXT("L'AI ha schierato in X:%d Y:%d (Elevazione: %d)"), RandX, RandY, It->ElevationLevel);
+						}
+					}
+				}
+				break;
+			}
+		}
+	}
+}
+
+// gestisce le fasi di schieramento e di pulizia cliccando su una cella vuota
 void AMatchManager::OnCellClicked(int32 X, int32 Y, int32 Elevation)
 {
-	// --- FASE 1: SCHIERAMENTO ---
+	if (CurrentPhase == EMatchPhase::GameOver) return;
+
 	if (CurrentPhase == EMatchPhase::Deployment && CurrentTurn == EPlayerTurn::HumanPlayer)
 	{
 		if (Y > 2) {
@@ -91,7 +148,6 @@ void AMatchManager::OnCellClicked(int32 X, int32 Y, int32 Elevation)
 				{
 					BaseUnit->GridX = X;
 					BaseUnit->GridY = Y;
-					// --- AGGIUNTE PER IL RESPAWN ---
 					BaseUnit->OriginalGridX = X;
 					BaseUnit->OriginalGridY = Y;
 					BaseUnit->MaxHealthPoints = BaseUnit->HealthPoints;
@@ -118,24 +174,21 @@ void AMatchManager::OnCellClicked(int32 X, int32 Y, int32 Elevation)
 					if (CurrentTurn == EPlayerTurn::HumanPlayer)
 					{
 						UE_LOG(LogTemp, Warning, TEXT("Schieramento completato. Inizia la battaglia! TOCCA A TE."));
-						AggiornaViteHUD();
+						UpdateHealthHUD();
 					}
 					else
 					{
 						UE_LOG(LogTemp, Warning, TEXT("Schieramento completato. Inizia la battaglia! TOCCA ALL'AI."));
-						AggiornaViteHUD();
+						UpdateHealthHUD();
 						CurrentTurn = EPlayerTurn::HumanPlayer;
 						UE_LOG(LogTemp, Warning, TEXT("[DEBUG] L'AI salta il suo primo turno. Tocca a te!"));
 					}
 				}
 			}
 		}
-		return; // Ferma l'esecuzione qui
+		return;
 	}
 
-	// --- FASE 2: GIOCO ---
-	// Se siamo in fase di gioco e clicchiamo col TASTO SINISTRO su una cella vuota,
-	// deselezioniamo l'unità attualmente selezionata per fare pulizia a schermo.
 	if (CurrentPhase == EMatchPhase::Playing && CurrentTurn == EPlayerTurn::HumanPlayer)
 	{
 		if (SelectedUnit)
@@ -147,97 +200,16 @@ void AMatchManager::OnCellClicked(int32 X, int32 Y, int32 Elevation)
 	}
 }
 
-void AMatchManager::DeploySingleAIUnit()
-{
-	int32 RandX, RandY;
-	bool bValidLocation = false;
-	int32 Tentativi = 0;
-
-	// Ciclo finché non trova una cella valida (massimo 50 tentativi per evitare loop infiniti)
-	while (!bValidLocation && Tentativi < 50)
-	{
-		RandX = FMath::RandRange(0, 24);
-		RandY = FMath::RandRange(22, 24);
-		Tentativi++;
-
-		// Cerchiamo la cella nel mondo per controllare l'elevazione
-		for (TActorIterator<AGridCell> It(GetWorld()); It; ++It)
-		{
-			if (It->GridPosition.X == RandX && It->GridPosition.Y == RandY)
-			{
-				if (It->ElevationLevel > 0) // NON È ACQUA
-				{
-					bValidLocation = true;
-
-					// Procediamo con lo spawn
-					FVector AISpawnLoc(RandY * 100.0f, RandX * 100.0f, (It->ElevationLevel * 50.0f) + 100.0f);
-					TSubclassOf<AActor> AIUnitToSpawn = (AIUnitsDeployed == 0) ? TSubclassOf<AActor>(SniperClass) : TSubclassOf<AActor>(BrawlerClass);
-
-					if (AIUnitToSpawn)
-					{
-						AActor* SpawnedAIUnit = GetWorld()->SpawnActor<AActor>(AIUnitToSpawn, AISpawnLoc, FRotator(0, 180, 0));
-						if (SpawnedAIUnit)
-						{
-							SetUnitColor(SpawnedAIUnit, FLinearColor(0.5f, 0.0f, 0.2f));
-							SpawnedAIUnit->Tags.Add(FName("EnemyUnit")); // Gia che ci siamo, etichettiamo anche loro!
-
-
-							AUnitBase* BaseAIUnit = Cast<AUnitBase>(SpawnedAIUnit);
-							if (BaseAIUnit)
-							{
-								BaseAIUnit->GridX = RandX;
-								BaseAIUnit->GridY = RandY;
-								// --- AGGIUNTE PER IL RESPAWN ---
-								BaseAIUnit->OriginalGridX = RandX;
-								BaseAIUnit->OriginalGridY = RandY;
-								BaseAIUnit->MaxHealthPoints = BaseAIUnit->HealthPoints;
-							}
-							AIUnitsDeployed++;
-							UE_LOG(LogTemp, Warning, TEXT("L'AI ha schierato in X:%d Y:%d (Elevazione: %d)"), RandX, RandY, It->ElevationLevel);
-						}
-					}
-				}
-				break; // Trovata la cella, esce dal ciclo TActorIterator
-			}
-		}
-	}
-}
-
-void AMatchManager::SetUnitColor(AActor* Unit, FLinearColor Color)
-{
-	if (!Unit || !BaseUnitMaterial) return;
-
-	// 1. Cerchiamo la Static Mesh dell'unità
-	UStaticMeshComponent* Mesh = Unit->FindComponentByClass<UStaticMeshComponent>();
-	if (Mesh)
-	{
-		// 2. Creiamo una copia dinamica del materiale base
-		UMaterialInstanceDynamic* DynamicMat = Mesh->CreateDynamicMaterialInstance(0, BaseUnitMaterial);
-		if (DynamicMat)
-		{
-			// 3. Cambiamo il parametro 'BodyColor' (stesso nome dato in Unreal!)
-			DynamicMat->SetVectorParameterValue(FName("BodyColor"), Color);
-
-			// Applichiamo il materiale dinamico alla mesh
-			Mesh->SetMaterial(0, DynamicMat);
-		}
-	}
-}
-
+// illumina le celle di movimento e attacco relative all'unita selezionata dal giocatore
 void AMatchManager::OnUnitClicked(AActor* ClickedUnit)
 {
-	// 1. REQUISITI MINIMI: Se non siamo in gioco, usciamo subito
 	if (CurrentPhase != EMatchPhase::Playing || !ClickedUnit) return;
+	if (CurrentTurn != EPlayerTurn::HumanPlayer) return;
 
 	AUnitBase* ClickedBaseUnit = Cast<AUnitBase>(ClickedUnit);
 
-	// 2. FILTRO TURNO: Se non è il turno dell'umano, non permettiamo la selezione/movimento
-	if (CurrentTurn != EPlayerTurn::HumanPlayer) return;
-
-	// 3. FILTRO FAZIONE: Se clicchi un nemico durante il tuo turno usciamo per non "selezionarlo"
 	if (ClickedUnit->ActorHasTag(FName("EnemyUnit")))
 	{
-		// Opzionale: puliamo i cerchi gialli se avevamo qualcun altro selezionato
 		if (SelectedUnit)
 		{
 			SetUnitColor(SelectedUnit, FLinearColor(0.0f, 0.5f, 1.0f));
@@ -247,14 +219,13 @@ void AMatchManager::OnUnitClicked(AActor* ClickedUnit)
 		return;
 	}
 
-	// 4. SELEZIONE ALLEATO (Logica di movimento/attacco)
 	if (SelectedUnit)
 	{
 		SetUnitColor(SelectedUnit, FLinearColor(0.0f, 0.5f, 1.0f));
 	}
 
 	SelectedUnit = ClickedUnit;
-	SetUnitColor(SelectedUnit, FLinearColor(0.5f, 1.0f, 1.0f)); // Azzurro selezione
+	SetUnitColor(SelectedUnit, FLinearColor(0.5f, 1.0f, 1.0f));
 
 	if (ClickedBaseUnit)
 	{
@@ -267,7 +238,6 @@ void AMatchManager::OnUnitClicked(AActor* ClickedUnit)
 			return;
 		}
 
-		// Calcolo zone d'azione (Movimento/Attacco)
 		for (TActorIterator<AGridManager> It(GetWorld()); It; ++It)
 		{
 			ClearHighlights();
@@ -290,16 +260,79 @@ void AMatchManager::OnUnitClicked(AActor* ClickedUnit)
 	}
 }
 
-void AMatchManager::ClearHighlights()
+// verifica la cella di destinazione e invia ordini di combattimento o spostamento
+void AMatchManager::HandleRightClick(int32 X, int32 Y)
 {
-	// Spegniamo tutto usando un unico ciclo su entrambe le liste
-	for (AGridCell* Cell : ValidMoveCells) if (Cell) Cell->HighlightCell(false);
-	for (AGridCell* Cell : ValidAttackCells) if (Cell) Cell->HighlightCell(false);
+	if (CurrentPhase == EMatchPhase::GameOver) return;
+	if (!SelectedUnit || CurrentTurn != EPlayerTurn::HumanPlayer) return;
 
-	ValidMoveCells.Empty();
-	ValidAttackCells.Empty();
+	AUnitBase* BaseUnit = Cast<AUnitBase>(SelectedUnit);
+	if (!BaseUnit) return;
+
+	AGridCell* TargetCell = nullptr;
+	for (TActorIterator<AGridManager> It(GetWorld()); It; ++It)
+	{
+		TargetCell = It->GridCells[X][Y];
+		break;
+	}
+
+	if (!TargetCell) return;
+
+	if (ValidAttackCells.Contains(TargetCell))
+	{
+		for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
+		{
+			if (It->GridX == X && It->GridY == Y && It->ActorHasTag("EnemyUnit"))
+			{
+				AUnitBase* EnemyUnit = *It;
+				ExecuteAttack(BaseUnit, EnemyUnit);
+				return;
+			}
+		}
+	}
+
+	if (ValidMoveCells.Contains(TargetCell) && !TargetCell->bIsOccupied)
+	{
+		ExecuteMovement(BaseUnit, X, Y, TargetCell);
+	}
 }
 
+// resetta le abilita della fazione giocante e aggiorna i testi dei turni
+void AMatchManager::StartNewTurn(EPlayerTurn NewTurn)
+{
+	CurrentTurn = NewTurn;
+	ClearHighlights();
+	SelectedUnit = nullptr;
+
+	for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
+	{
+		if (NewTurn == EPlayerTurn::HumanPlayer && It->ActorHasTag("PlayerUnit"))
+		{
+			It->bHasMovedThisTurn = false;
+			SetUnitColor(*It, FLinearColor::White);
+		}
+		else if (NewTurn == EPlayerTurn::AIPlayer && It->ActorHasTag("EnemyUnit"))
+		{
+			It->bHasMovedThisTurn = false;
+			SetUnitColor(*It, FLinearColor::White);
+		}
+	}
+
+	if (ActiveHUD)
+	{
+		FString TextTurn = (CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TUO TURNO") : TEXT("TURNO AVVERSARIO");
+		ActiveHUD->SetTurnText(TextTurn);
+	}
+
+	if (CurrentTurn == EPlayerTurn::AIPlayer)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AI] Sto calcolando i percorsi ottimali..."));
+		FTimerHandle TimerHandle;
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AMatchManager::ExecuteAITurn, 1.0f, false);
+	}
+}
+
+// assicura che il turno cambi solo se tutte le pedine della squadra attiva hanno agito
 void AMatchManager::CheckEndTurn()
 {
 	bool bAllUnitsDone = true;
@@ -320,16 +353,14 @@ void AMatchManager::CheckEndTurn()
 
 	if (bAllUnitsDone)
 	{
-		EvaluateTowers(); // Valuta gli obiettivi a fine turno
+		EvaluateTowers();
 
-		// ---> NUOVO: SE QUALCUNO HA VINTO, FERMA TUTTO! <---
 		if (CurrentPhase == EMatchPhase::GameOver)
 		{
 			UE_LOG(LogTemp, Warning, TEXT("Partita Terminata! Il ciclo dei turni e' bloccato."));
-			return; // Usciamo dalla funzione senza passare il turno
+			return;
 		}
 
-		// Cambia turno (se stiamo ancora giocando)
 		if (CurrentTurn == EPlayerTurn::HumanPlayer)
 			StartNewTurn(EPlayerTurn::AIPlayer);
 		else
@@ -337,94 +368,14 @@ void AMatchManager::CheckEndTurn()
 	}
 	else if (CurrentTurn == EPlayerTurn::AIPlayer)
 	{
-		// L'IA non ha finito! Aspetta 1 secondo e muovi il soldato successivo
 		FTimerHandle TimerHandle;
 		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AMatchManager::ExecuteAITurn, 1.0f, false);
 	}
 }
 
-void AMatchManager::StartNewTurn(EPlayerTurn NewTurn)
-{
-	CurrentTurn = NewTurn;
-	ClearHighlights();
-	SelectedUnit = nullptr;
-
-	// Sblocchiamo tutte le unità del giocatore attivo
-	for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
-	{
-		if (NewTurn == EPlayerTurn::HumanPlayer && It->ActorHasTag("PlayerUnit"))
-		{
-			It->bHasMovedThisTurn = false;
-			SetUnitColor(*It, FLinearColor::White);
-		}
-		else if (NewTurn == EPlayerTurn::AIPlayer && It->ActorHasTag("EnemyUnit"))
-		{
-			It->bHasMovedThisTurn = false;
-			SetUnitColor(*It, FLinearColor::White);
-		}
-	}
-
-	// AGGIORNAMENTO HUD
-	if (ActiveHUD)
-	{
-		FString TestoTurno = (CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TUO TURNO") : TEXT("TURNO AVVERSARIO");
-		ActiveHUD->SetTurnoText(TestoTurno);
-	}
-
-	// LOGICA AI
-	if (CurrentTurn == EPlayerTurn::AIPlayer)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("[AI] Sto calcolando i percorsi ottimali..."));
-		FTimerHandle TimerHandle;
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &AMatchManager::ExecuteAITurn, 1.0f, false);
-	}
-}
-
-void AMatchManager::HandleRightClick(int32 X, int32 Y)
-{
-	if (!SelectedUnit || CurrentTurn != EPlayerTurn::HumanPlayer) return;
-
-	AUnitBase* BaseUnit = Cast<AUnitBase>(SelectedUnit);
-	if (!BaseUnit) return;
-
-	// Troviamo la cella bersaglio nel GridManager
-	AGridCell* TargetCell = nullptr;
-	for (TActorIterator<AGridManager> It(GetWorld()); It; ++It)
-	{
-		TargetCell = It->GridCells[X][Y];
-		break;
-	}
-
-	if (!TargetCell) return;
-
-	// --- CASO A: ATTACCO ---
-	// Se la cella è Rossa o Arancione (ValidAttackCells) E c'è un nemico
-	if (ValidAttackCells.Contains(TargetCell))
-	{
-		for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
-		{
-			if (It->GridX == X && It->GridY == Y && It->ActorHasTag("EnemyUnit"))
-			{
-				// Abbiamo trovato il nemico, passiamolo alla funzione di attacco!
-				AUnitBase* EnemyUnit = *It;
-				ExecuteAttack(BaseUnit, EnemyUnit);
-				return;
-			}
-		}
-	}
-
-	// --- CASO B: MOVIMENTO ---
-	// Se la cella è Gialla o Arancione (ValidMoveCells) ed è libera
-	if (ValidMoveCells.Contains(TargetCell) && !TargetCell->bIsOccupied)
-	{
-		// Usiamo la logica che avevi già nel OnCellClicked per spostare l'unità
-		ExecuteMovement(BaseUnit, X, Y, TargetCell);
-	}
-}
-
+// teletrasporta l'unita nella nuova posizione e aggiorna lo stato di occupazione della griglia
 void AMatchManager::ExecuteMovement(AUnitBase* BaseUnit, int32 X, int32 Y, AGridCell* TargetCell)
 {
-	// Cerchiamo il GridManager per poter aggiornare l'occupazione delle celle
 	AGridManager* GridMgr = nullptr;
 	for (TActorIterator<AGridManager> It(GetWorld()); It; ++It)
 	{
@@ -434,94 +385,84 @@ void AMatchManager::ExecuteMovement(AUnitBase* BaseUnit, int32 X, int32 Y, AGrid
 
 	if (GridMgr && BaseUnit && TargetCell)
 	{
-		// 1. Liberiamo la vecchia mattonella!
 		GridMgr->GridCells[BaseUnit->GridX][BaseUnit->GridY]->bIsOccupied = false;
+
 		FString MoveLog = FString::Printf(TEXT("[%s] %s: %s -> %s"),
 			(CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TU") : TEXT("AI"),
 			Cast<ASniper>(BaseUnit) ? TEXT("S") : TEXT("B"),
 			*GetChessCoordinate(BaseUnit->GridX, BaseUnit->GridY),
 			*GetChessCoordinate(X, Y));
 
-		if (ActiveHUD) ActiveHUD->AggiungiMossa(MoveLog);
-		// 2. Spostiamo fisicamente l'attore (usando l'elevazione della nuova cella)
+		if (ActiveHUD) ActiveHUD->AddMoveToHistory(MoveLog);
+
 		FVector NewLocation(Y * 100.0f, X * 100.0f, (TargetCell->ElevationLevel * 50.0f) + 100.0f);
 		BaseUnit->SetActorLocation(NewLocation);
 
-		// 3. Aggiorniamo il GPS e occupiamo la nuova mattonella!
 		BaseUnit->GridX = X;
 		BaseUnit->GridY = Y;
 		TargetCell->bIsOccupied = true;
 
-		// 4. BLOCCIAMO I FUTURI MOVIMENTI PER QUESTO TURNO
 		BaseUnit->bHasMovedThisTurn = true;
 
-		UE_LOG(LogTemp, Warning, TEXT("Movimento eseguito tramite Tasto Destro su X:%d Y:%d."), X, Y);
-
-		// 5. Spegniamo le luci e passiamo il turno
 		ClearHighlights();
 		if (BaseUnit->ActorHasTag("PlayerUnit")) {
-			SetUnitColor(BaseUnit, FLinearColor(0.0f, 0.5f, 1.0f)); // Azzurro
+			SetUnitColor(BaseUnit, FLinearColor(0.0f, 0.5f, 1.0f));
 		}
 		else {
-			SetUnitColor(BaseUnit, FLinearColor(0.5f, 0.0f, 0.2f)); // Rosso Scuro
+			SetUnitColor(BaseUnit, FLinearColor(0.5f, 0.0f, 0.2f));
 		}
 		SelectedUnit = nullptr;
 		CheckEndTurn();
 	}
 }
 
+// applica i danni, gestisce i contrattacchi mirati e respawna le unita con zero hp
 void AMatchManager::ExecuteAttack(AUnitBase* Attacker, AUnitBase* Defender)
 {
 	if (!Attacker || !Defender) return;
 
-	// 1. CALCOLO DEI DANNI DELL'ATTACCANTE
 	int32 Damage = FMath::RandRange(Attacker->MinDamage, Attacker->MaxDamage);
 	Defender->HealthPoints -= Damage;
+
 	FString AttackLog = FString::Printf(TEXT("[%s] %s: %s DMG: %d"),
 		(CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("TU") : TEXT("AI"),
 		Cast<ASniper>(Attacker) ? TEXT("S") : TEXT("B"),
 		*GetChessCoordinate(Defender->GridX, Defender->GridY),
 		Damage);
 
-	if (ActiveHUD) ActiveHUD->AggiungiMossa(AttackLog);
+	if (ActiveHUD) ActiveHUD->AddMoveToHistory(AttackLog);
 
 	UE_LOG(LogTemp, Warning, TEXT("BAM! %s infligge %d danni a %s! (HP Rimanenti: %d)"),
 		*Attacker->GetName(), Damage, *Defender->GetName(), Defender->HealthPoints);
 
-	// --- NUOVO: CONTRATTACCO (Requisito 8) ---
-	int32 DistanzaCombattimento = FMath::Abs(Attacker->GridX - Defender->GridX) + FMath::Abs(Attacker->GridY - Defender->GridY);
+	int32 CombatDistance = FMath::Abs(Attacker->GridX - Defender->GridX) + FMath::Abs(Attacker->GridY - Defender->GridY);
 	bool bShouldCounterAttack = false;
 
-	// Regola da PDF: Il contrattacco avviene SOLO se l'attaccante è uno Sniper
 	if (Cast<ASniper>(Attacker))
 	{
-		// Se il difensore è un altro Sniper -> Sempre contrattacco
 		if (Cast<ASniper>(Defender))
 		{
 			bShouldCounterAttack = true;
 		}
-		// Se il difensore è un Brawler -> Contrattacco solo se a distanza 1
-		else if (Cast<ABrawler>(Defender) && DistanzaCombattimento == 1)
+		else if (Cast<ABrawler>(Defender) && CombatDistance == 1)
 		{
 			bShouldCounterAttack = true;
 		}
 	}
 
-	// Esecuzione del contrattacco se le condizioni sono verificate e il difensore è ancora vivo
 	if (bShouldCounterAttack && Defender->HealthPoints > 0)
 	{
-		int32 CounterDamage = FMath::RandRange(1, 3); // Danno da contrattacco: 1-3
+		int32 CounterDamage = FMath::RandRange(1, 3);
 		Attacker->HealthPoints -= CounterDamage;
 		UE_LOG(LogTemp, Warning, TEXT("CONTRATTACCO! %s restituisce il favore infliggendo %d danni a %s! (HP Attaccante: %d)"),
 			*Defender->GetName(), CounterDamage, *Attacker->GetName(), Attacker->HealthPoints);
 
-		// Log del contrattacco nello Storico Mosse (L'opposto di chi ha attaccato)
 		FString CounterLog = FString::Printf(TEXT("[%s] Contrattacco: %d DMG"),
 			(CurrentTurn == EPlayerTurn::HumanPlayer) ? TEXT("AI") : TEXT("TU"),
 			CounterDamage);
-		if (ActiveHUD) ActiveHUD->AggiungiMossa(CounterLog);
 
-		// Dobbiamo controllare se l'ATTACCANTE è morto per il contrattacco!
+		if (ActiveHUD) ActiveHUD->AddMoveToHistory(CounterLog);
+
 		if (Attacker->HealthPoints <= 0)
 		{
 			UE_LOG(LogTemp, Error, TEXT("%s e' MORTO DI CONTRATTACCO! Torna alla base."), *Attacker->GetName());
@@ -539,9 +480,7 @@ void AMatchManager::ExecuteAttack(AUnitBase* Attacker, AUnitBase* Defender)
 			}
 		}
 	}
-	// ----------------------------------------
 
-	// 2. CONTROLLO SCONFITTA E RESPAWN DEL DIFENSORE
 	if (Defender->HealthPoints <= 0)
 	{
 		UE_LOG(LogTemp, Error, TEXT("%s e' STATO SCONFITTO! Torna alla base."), *Defender->GetName());
@@ -561,24 +500,148 @@ void AMatchManager::ExecuteAttack(AUnitBase* Attacker, AUnitBase* Defender)
 		}
 	}
 
-	// 3. BLOCCIAMO L'UNITÀ ATTACCANTE (Il suo turno finisce)
 	Attacker->bHasMovedThisTurn = true;
 	Attacker->bHasAttackedThisTurn = true;
 
-	// 4. Puliamo la grafica e deselezioniamo
 	ClearHighlights();
 	if (Attacker->ActorHasTag("PlayerUnit")) {
-		SetUnitColor(Attacker, FLinearColor(0.0f, 0.5f, 1.0f)); // Azzurro
+		SetUnitColor(Attacker, FLinearColor(0.0f, 0.5f, 1.0f));
 	}
 	else {
-		SetUnitColor(Attacker, FLinearColor(0.5f, 0.0f, 0.2f)); // Rosso Scuro
+		SetUnitColor(Attacker, FLinearColor(0.5f, 0.0f, 0.2f));
 	}
+
 	SelectedUnit = nullptr;
-	AggiornaViteHUD();
-	// 5. Controlliamo se il turno deve passare
+	UpdateHealthHUD();
 	CheckEndTurn();
 }
 
+// logica centrale dell'avversario per prendere decisioni tra sparare, muoversi e presidiare
+void AMatchManager::ExecuteAITurn()
+{
+	AGridManager* GridMgr = nullptr;
+	for (TActorIterator<AGridManager> It(GetWorld()); It; ++It) { GridMgr = *It; break; }
+	if (!GridMgr) return;
+
+	AUnitBase* ActiveAI = nullptr;
+	for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It) {
+		if (It->ActorHasTag("EnemyUnit") && !It->bHasMovedThisTurn) {
+			ActiveAI = *It;
+			break;
+		}
+	}
+
+	if (!ActiveAI) {
+		CheckEndTurn();
+		return;
+	}
+
+	for (TActorIterator<ATower> It(GetWorld()); It; ++It)
+	{
+		if (It->CurrentOwner == ETowerOwner::AIPlayer)
+		{
+			int32 DistX = FMath::Abs(ActiveAI->GridX - (int32)It->GridPosition.X);
+			int32 DistY = FMath::Abs(ActiveAI->GridY - (int32)It->GridPosition.Y);
+
+			if (DistX <= 2 && DistY <= 2)
+			{
+				TArray<AGridCell*> CelleAttaccoStatica = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
+				for (AGridCell* Cell : CelleAttaccoStatica) {
+					for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
+						if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
+							ExecuteAttack(ActiveAI, *UnitIt);
+							return;
+						}
+					}
+				}
+
+				ActiveAI->bHasMovedThisTurn = true;
+				SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
+				CheckEndTurn();
+				return;
+			}
+		}
+	}
+
+	AGridCell* StartCell = GridMgr->GridCells[ActiveAI->GridX][ActiveAI->GridY];
+
+	TArray<AGridCell*> CelleDiAttacco = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
+	for (AGridCell* Cell : CelleDiAttacco) {
+		for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
+			if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
+				ExecuteAttack(ActiveAI, *UnitIt);
+				return;
+			}
+		}
+	}
+
+	AGridCell* TargetIdeal = nullptr;
+	int32 MinDist = 9999;
+
+	for (TActorIterator<ATower> It(GetWorld()); It; ++It) {
+		if (It->CurrentOwner != ETowerOwner::AIPlayer) {
+			int32 Dist = FMath::Abs((int32)It->GridPosition.X - ActiveAI->GridX) + FMath::Abs((int32)It->GridPosition.Y - ActiveAI->GridY);
+			if (Dist < MinDist) {
+				MinDist = Dist;
+				TargetIdeal = GridMgr->GridCells[(int32)It->GridPosition.X][(int32)It->GridPosition.Y];
+			}
+		}
+	}
+
+	if (!TargetIdeal) {
+		for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It) {
+			if (It->ActorHasTag("PlayerUnit")) {
+				int32 Dist = FMath::Abs(It->GridX - ActiveAI->GridX) + FMath::Abs(It->GridY - ActiveAI->GridY);
+				if (Dist < MinDist) {
+					MinDist = Dist;
+					TargetIdeal = GridMgr->GridCells[It->GridX][It->GridY];
+				}
+			}
+		}
+	}
+
+	if (TargetIdeal) {
+		TArray<AGridCell*> Path = GridMgr->FindPath(StartCell, TargetIdeal);
+
+		if (Path.Num() > 0) {
+			AGridCell* ArrivalCell = StartCell;
+			int32 CurrentCost = 0;
+
+			for (AGridCell* StepCell : Path) {
+				if (StepCell->bIsOccupied) break;
+
+				bool bTowerCell = false;
+				for (TActorIterator<ATower> Twr(GetWorld()); Twr; ++Twr) {
+					if ((int32)Twr->GridPosition.X == StepCell->GridPosition.X && (int32)Twr->GridPosition.Y == StepCell->GridPosition.Y) {
+						bTowerCell = true; break;
+					}
+				}
+				if (bTowerCell) break;
+
+				int32 StepCost = (StepCell->ElevationLevel > ArrivalCell->ElevationLevel) ? 2 : 1;
+
+				if (CurrentCost + StepCost <= ActiveAI->MovementRange) {
+					CurrentCost += StepCost;
+					ArrivalCell = StepCell;
+				}
+				else {
+					break;
+				}
+			}
+
+			if (ArrivalCell != StartCell) {
+				ExecuteMovement(ActiveAI, ArrivalCell->GridPosition.X, ArrivalCell->GridPosition.Y, ArrivalCell);
+				return;
+			}
+		}
+	}
+
+	ActiveAI->bHasMovedThisTurn = true;
+	SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
+	CheckEndTurn();
+}
+
+// calcola quante pedine occupano le zone torri e le assegna per stabilire il vincitore
 void AMatchManager::EvaluateTowers()
 {
 	HumanTowersControlled = 0;
@@ -628,10 +691,9 @@ void AMatchManager::EvaluateTowers()
 
 	if (ActiveHUD)
 	{
-		ActiveHUD->SetTorriText(HumanTowersControlled, AITowersControlled);
+		ActiveHUD->SetTowersText(HumanTowersControlled, AITowersControlled);
 	}
 
-	// CONTROLLO CONDIZIONE DI VITTORIA (2 Torri per 2 Turni)
 	bool bGameShouldEnd = false;
 
 	if (CurrentTurn == EPlayerTurn::HumanPlayer)
@@ -651,156 +713,14 @@ void AMatchManager::EvaluateTowers()
 		else AIConsecutiveTurns = 0;
 	}
 
-	// AVVIO COUNTDOWN SE QUALCUNO HA VINTO
 	if (bGameShouldEnd && CurrentPhase != EMatchPhase::GameOver)
 	{
 		CurrentPhase = EMatchPhase::GameOver;
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle_Reset, this, &AMatchManager::EseguiCountdown, 1.0f, true);
-		UE_LOG(LogTemp, Warning, TEXT("Partita terminata per controllo torri! Reset avviato."));
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle_Reset, this, &AMatchManager::RunCountdown, 1.0f, true);
 	}
 }
 
-// --- LOGICA AI E GESTIONE TURNO ---
-
-void AMatchManager::ExecuteAITurn()
-{
-	UE_LOG(LogTemp, Warning, TEXT("L'AI sta analizzando la mappa..."));
-
-	AGridManager* GridMgr = nullptr;
-	for (TActorIterator<AGridManager> It(GetWorld()); It; ++It) { GridMgr = *It; break; }
-	if (!GridMgr) return;
-
-	// 1. Troviamo il primo soldato nemico pronto all'azione
-	AUnitBase* ActiveAI = nullptr;
-	for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It) {
-		if (It->ActorHasTag("EnemyUnit") && !It->bHasMovedThisTurn) {
-			ActiveAI = *It;
-			break;
-		}
-	}
-
-	// Sicurezza: se non c'è nessuno da muovere, passa il turno
-	if (!ActiveAI) {
-		CheckEndTurn();
-		return;
-	}
-
-	// --- NUOVA LOGICA: CONTROLLO PRESIDIO (FASE 3) ---
-	// Se l'unità è già entro 2 celle da una torre controllata dall'AI, resta a difendere
-	for (TActorIterator<ATower> It(GetWorld()); It; ++It)
-	{
-		if (It->CurrentOwner == ETowerOwner::AIPlayer)
-		{
-			int32 DistX = FMath::Abs(ActiveAI->GridX - (int32)It->GridPosition.X);
-			int32 DistY = FMath::Abs(ActiveAI->GridY - (int32)It->GridPosition.Y);
-
-			if (DistX <= 2 && DistY <= 2)
-			{
-				UE_LOG(LogTemp, Warning, TEXT("[AI] %s presidia la torre in %d,%d. Difesa attiva!"), *ActiveAI->GetName(), (int32)It->GridPosition.X, (int32)It->GridPosition.Y);
-
-				// Cerca bersagli nel raggio d'attacco senza muoversi
-				TArray<AGridCell*> CelleAttaccoStatica = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
-				for (AGridCell* Cell : CelleAttaccoStatica) {
-					for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
-						if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
-							UE_LOG(LogTemp, Warning, TEXT("[AI] Bersaglio trovato mentre presidio! Fuoco!"));
-							ExecuteAttack(ActiveAI, *UnitIt);
-							return;
-						}
-					}
-				}
-
-				// Se presidia e non ha nessuno a tiro, finisce il turno qui
-				ActiveAI->bHasMovedThisTurn = true;
-				SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
-				CheckEndTurn();
-				return;
-			}
-		}
-	}
-
-	AGridCell* StartCell = GridMgr->GridCells[ActiveAI->GridX][ActiveAI->GridY];
-
-	// --- PRIORITÀ 1: SCONTRO A FUOCO (ATTACCO DINAMICO) ---
-	TArray<AGridCell*> CelleDiAttacco = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
-	for (AGridCell* Cell : CelleDiAttacco) {
-		for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
-			if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
-				UE_LOG(LogTemp, Warning, TEXT("L'AI ha un bersaglio a tiro! FUOCO!"));
-				ExecuteAttack(ActiveAI, *UnitIt);
-				return;
-			}
-		}
-	}
-
-	// --- PRIORITÀ 2: CATTURA TORRI O INSEGUIMENTO ---
-	AGridCell* BersaglioIdeale = nullptr;
-	int32 DistanzaMinima = 9999;
-
-	for (TActorIterator<ATower> It(GetWorld()); It; ++It) {
-		if (It->CurrentOwner != ETowerOwner::AIPlayer) {
-			int32 Dist = FMath::Abs((int32)It->GridPosition.X - ActiveAI->GridX) + FMath::Abs((int32)It->GridPosition.Y - ActiveAI->GridY);
-			if (Dist < DistanzaMinima) {
-				DistanzaMinima = Dist;
-				BersaglioIdeale = GridMgr->GridCells[(int32)It->GridPosition.X][(int32)It->GridPosition.Y];
-			}
-		}
-	}
-
-	if (!BersaglioIdeale) {
-		for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It) {
-			if (It->ActorHasTag("PlayerUnit")) {
-				int32 Dist = FMath::Abs(It->GridX - ActiveAI->GridX) + FMath::Abs(It->GridY - ActiveAI->GridY);
-				if (Dist < DistanzaMinima) {
-					DistanzaMinima = Dist;
-					BersaglioIdeale = GridMgr->GridCells[It->GridX][It->GridY];
-				}
-			}
-		}
-	}
-
-	// --- 3. NAVIGAZIONE (GPS) ---
-	if (BersaglioIdeale) {
-		TArray<AGridCell*> Percorso = GridMgr->FindPath(StartCell, BersaglioIdeale);
-
-		if (Percorso.Num() > 0) {
-			AGridCell* CellaArrivo = StartCell;
-			int32 CostoAttuale = 0;
-
-			for (AGridCell* StepCell : Percorso) {
-				if (StepCell->bIsOccupied) break;
-
-				bool bCellaConTorre = false;
-				for (TActorIterator<ATower> Twr(GetWorld()); Twr; ++Twr) {
-					if ((int32)Twr->GridPosition.X == StepCell->GridPosition.X && (int32)Twr->GridPosition.Y == StepCell->GridPosition.Y) {
-						bCellaConTorre = true; break;
-					}
-				}
-				if (bCellaConTorre) break;
-
-				int32 CostoPasso = (StepCell->ElevationLevel > CellaArrivo->ElevationLevel) ? 2 : 1;
-
-				if (CostoAttuale + CostoPasso <= ActiveAI->MovementRange) {
-					CostoAttuale += CostoPasso;
-					CellaArrivo = StepCell;
-				}
-				else {
-					break;
-				}
-			}
-
-			if (CellaArrivo != StartCell) {
-				ExecuteMovement(ActiveAI, CellaArrivo->GridPosition.X, CellaArrivo->GridPosition.Y, CellaArrivo);
-				return;
-			}
-		}
-	}
-
-	ActiveAI->bHasMovedThisTurn = true;
-	SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
-	CheckEndTurn();
-}
-
+// valuta a fine turno se una squadra ha vinto scatenando il reset
 void AMatchManager::CheckGameOver()
 {
 	int32 PlayerUnitsCount = 0;
@@ -814,73 +734,94 @@ void AMatchManager::CheckGameOver()
 
 	bool bGameShouldEnd = false;
 
-	// Vittoria Umana: 0 nemici o 3 torri
 	if (AIUnitsCount <= 0 || HumanTowersControlled >= 3)
 	{
 		bGameShouldEnd = true;
-		UE_LOG(LogTemp, Warning, TEXT("CONDIZIONE RAGGIUNTA: Vittoria Umana"));
 	}
-	// Vittoria AI: 0 player o 3 torri
 	else if (PlayerUnitsCount <= 0 || AITowersControlled >= 3)
 	{
 		bGameShouldEnd = true;
-		UE_LOG(LogTemp, Error, TEXT("CONDIZIONE RAGGIUNTA: Vittoria AI"));
 	}
 
-	// AVVIO COUNTDOWN
 	if (bGameShouldEnd && CurrentPhase != EMatchPhase::GameOver)
 	{
 		CurrentPhase = EMatchPhase::GameOver;
-		GetWorld()->GetTimerManager().SetTimer(TimerHandle_Reset, this, &AMatchManager::EseguiCountdown, 1.0f, true);
-		UE_LOG(LogTemp, Warning, TEXT("Partita terminata! Reset in 10 secondi."));
+		GetWorld()->GetTimerManager().SetTimer(TimerHandle_Reset, this, &AMatchManager::RunCountdown, 1.0f, true);
 	}
 }
 
-FString AMatchManager::GetChessCoordinate(int32 X, int32 Y)
+// crea una copia dinamica del materiale per colorare liberamente le pedine 3d
+void AMatchManager::SetUnitColor(AActor* Unit, FLinearColor Color)
 {
-	// Convertiamo il numero Y (0-24) nella lettera (A-Y) aggiungendo Y al codice ASCII di 'A'
-	char Lettera = 'A' + Y;
-	return FString::Printf(TEXT("%c%d"), Lettera, X);
+	if (!Unit || !BaseUnitMaterial) return;
+
+	UStaticMeshComponent* Mesh = Unit->FindComponentByClass<UStaticMeshComponent>();
+	if (Mesh)
+	{
+		UMaterialInstanceDynamic* DynamicMat = Mesh->CreateDynamicMaterialInstance(0, BaseUnitMaterial);
+		if (DynamicMat)
+		{
+			DynamicMat->SetVectorParameterValue(FName("BodyColor"), Color);
+			Mesh->SetMaterial(0, DynamicMat);
+		}
+	}
 }
 
-void AMatchManager::AggiornaViteHUD()
+// spegne la colorazione speciale ripristinando le celle gialle e rosse al materiale standard
+void AMatchManager::ClearHighlights()
+{
+	for (AGridCell* Cell : ValidMoveCells) if (Cell) Cell->HighlightCell(false);
+	for (AGridCell* Cell : ValidAttackCells) if (Cell) Cell->HighlightCell(false);
+
+	ValidMoveCells.Empty();
+	ValidAttackCells.Empty();
+}
+
+// traduce le righe e colonne in coordinate stile battaglia navale
+FString AMatchManager::GetChessCoordinate(int32 X, int32 Y)
+{
+	char Letter = 'A' + Y;
+	return FString::Printf(TEXT("%c%d"), Letter, X);
+}
+
+// ripesca i punti ferita aggiornati e li spara sul pannello visivo laterale
+void AMatchManager::UpdateHealthHUD()
 {
 	if (!ActiveHUD) return;
 
-	int32 VitaMioSniper = 0;
-	int32 VitaMioBrawler = 0;
-	int32 VitaAISniper = 0;
-	int32 VitaAIBrawler = 0;
+	int32 MySniperHP = 0;
+	int32 MyBrawlerHP = 0;
+	int32 AISniperHP = 0;
+	int32 AIBrawlerHP = 0;
 
-	// Cerchiamo tutte le unità nel mondo
 	for (TActorIterator<AUnitBase> It(GetWorld()); It; ++It)
 	{
-		AUnitBase* Unita = *It;
+		AUnitBase* Unit = *It;
 
-		if (Unita->ActorHasTag(FName("PlayerUnit")))
+		if (Unit->ActorHasTag(FName("PlayerUnit")))
 		{
-			if (Cast<ASniper>(Unita)) VitaMioSniper = Unita->HealthPoints;
-			else if (Cast<ABrawler>(Unita)) VitaMioBrawler = Unita->HealthPoints;
+			if (Cast<ASniper>(Unit)) MySniperHP = Unit->HealthPoints;
+			else if (Cast<ABrawler>(Unit)) MyBrawlerHP = Unit->HealthPoints;
 		}
-		else if (Unita->ActorHasTag(FName("EnemyUnit"))) // L'IA
+		else if (Unit->ActorHasTag(FName("EnemyUnit")))
 		{
-			if (Cast<ASniper>(Unita)) VitaAISniper = Unita->HealthPoints;
-			else if (Cast<ABrawler>(Unita)) VitaAIBrawler = Unita->HealthPoints;
+			if (Cast<ASniper>(Unit)) AISniperHP = Unit->HealthPoints;
+			else if (Cast<ABrawler>(Unit)) AIBrawlerHP = Unit->HealthPoints;
 		}
 	}
 
-	// Mandiamo i dati raccolti alla funzione che hai creato prima nell'HUD!
-	ActiveHUD->AggiornaStatisticheGlobali(VitaMioSniper, VitaMioBrawler, VitaAISniper, VitaAIBrawler);
+	ActiveHUD->UpdateGlobalStats(MySniperHP, MyBrawlerHP, AISniperHP, AIBrawlerHP);
 }
 
-void AMatchManager::EseguiCountdown()
+// esegue lo scorrere dei secondi centrali e ricarica il sistema arrivato a zero
+void AMatchManager::RunCountdown()
 {
 	CountdownReset--;
 
 	if (ActiveHUD)
 	{
-		FString Messaggio = (HumanTowersControlled >= 2) ? TEXT("VITTORIA!") : TEXT("SCONFITTA!");
-		ActiveHUD->MostraMessaggioFinale(Messaggio, CountdownReset);
+		FString Message = (HumanTowersControlled >= 2 || AIUnitsDeployed == 0) ? TEXT("VITTORIA!") : TEXT("SCONFITTA!");
+		ActiveHUD->ShowFinalMessage(Message, CountdownReset);
 	}
 
 	if (CountdownReset <= 0)
@@ -890,11 +831,12 @@ void AMatchManager::EseguiCountdown()
 	}
 }
 
+// spazza via tutti i dati sporchi della partita forzando il motore a riaprire il file mappa
 void AMatchManager::RestartGame()
 {
-	// Ricarica il livello attuale da zero
 	FName LevelName = *GetWorld()->GetMapName();
-	LevelName.ToString().RemoveFromStart(GetWorld()->StreamingLevelsPrefix);
+	FString LevelString = LevelName.ToString();
+	LevelString.RemoveFromStart(GetWorld()->StreamingLevelsPrefix);
 
-	UGameplayStatics::OpenLevel(GetWorld(), LevelName);
+	UGameplayStatics::OpenLevel(GetWorld(), FName(*LevelString));
 }

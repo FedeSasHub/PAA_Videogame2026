@@ -2,6 +2,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
+// inizializza il componente visivo della torre 
 ATower::ATower()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -10,17 +11,18 @@ ATower::ATower()
 	RootComponent = TowerMesh;
 }
 
+// salva le coordinate della griglia all'interno della torre
 void ATower::SetupTower(int32 X, int32 Y)
 {
 	GridPosition = FVector2D(X, Y);
-	UE_LOG(LogTemp, Warning, TEXT("Torre piazzata in X:%d Y:%d"), X, Y);
+	UE_LOG(LogTemp, Warning, TEXT("Tower placed at X:%d Y:%d"), X, Y);
 }
 
+// crea un'istanza dinamica del materiale per colorare la torre in base al proprietario (blu per il giocatore umano, rosso per l'IA, grigio quando è neutrale)
 void ATower::UpdateVisuals(FLinearColor Color)
 {
 	if (!TowerMesh) return;
 
-	// Cerchiamo di usare il materiale base se assegnato, altrimenti prendiamo quello di default
 	UMaterialInterface* MatToUse = BaseTowerMaterial ? BaseTowerMaterial : TowerMesh->GetMaterial(0);
 
 	if (MatToUse)
@@ -28,8 +30,6 @@ void ATower::UpdateVisuals(FLinearColor Color)
 		UMaterialInstanceDynamic* DynamicMat = TowerMesh->CreateDynamicMaterialInstance(0, MatToUse);
 		if (DynamicMat)
 		{
-			// NOTA: Nel Materiale della tua torre in Unreal, 
-			// ricordati di chiamare il nodo del colore "BodyColor" come per i soldati!
 			DynamicMat->SetVectorParameterValue(FName("BodyColor"), Color);
 			TowerMesh->SetMaterial(0, DynamicMat);
 		}

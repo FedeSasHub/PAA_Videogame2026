@@ -13,7 +13,6 @@ class PAA_VIDEOGAME2026_API ACameraPawn : public APawn
 public:
 	ACameraPawn();
 
-	// Il nostro "occhio" sul mondo
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	UCameraComponent* TopDownCamera;
 };

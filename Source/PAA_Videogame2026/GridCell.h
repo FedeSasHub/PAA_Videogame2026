@@ -18,22 +18,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadWrite, Category = "Grid State")
 	bool bIsOccupied = false;
 
-	// Livello di elevazione (da 0 a 4)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
 	int32 ElevationLevel;
 
-	// Coordinate nella griglia (X, Y)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Grid")
 	FVector2D GridPosition;
 
 	void SetupCell(int32 X, int32 Y, int32 Elevation);
 
-	// --- FUNZIONI EVIDENZIAZIONE ---
-	void HighlightCell(bool bEnable);        // Giallo (Movimento)
-	void HighlightAttackCell(bool bHighlight); // Rosso (Attacco)
-	void HighlightHybridCell(bool bHighlight); // Arancione (Entrambi)
+	void HighlightCell(bool bEnable);
+	void HighlightAttackCell(bool bHighlight);
+	void HighlightHybridCell(bool bHighlight);
 
-	// --- MATERIALI ---
 	UPROPERTY(EditDefaultsOnly, BlueprintReadWrite, Category = "Grid Appearance")
 	TArray<class UMaterialInterface*> ElevationMaterials;
 
@@ -50,7 +46,6 @@ public:
 	void OnCellClicked(UPrimitiveComponent* TouchedComponent, FKey ButtonPressed);
 
 private:
-	// Memorizza il materiale originale del terreno per il ripristino
 	UPROPERTY()
 	class UMaterialInterface* OriginalMaterial;
 };

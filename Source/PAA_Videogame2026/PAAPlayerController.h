@@ -13,13 +13,12 @@ public:
 	APAAPlayerController();
 
 protected:
-	// Questa funzione serve a "leggere" i tasti premuti (SetupInput)
 	virtual void SetupInputComponent() override;
+	virtual void BeginPlay() override;
 
-	// Questa è la funzione che scatta quando premi il tasto sinistro
 	void OnLeftClick();
 	void OnRightClick();
-	UFUNCTION(BlueprintCallable, Category = "Azioni Giocatore")
+
+	UFUNCTION(BlueprintCallable, Category = "Player Actions")
 	void OnWaitPressed();
-	virtual void BeginPlay() override;
 };
