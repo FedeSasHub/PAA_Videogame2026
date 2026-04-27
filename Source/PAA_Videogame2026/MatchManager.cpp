@@ -545,20 +545,38 @@ void AMatchManager::ExecuteAITurn()
 
 			if (DistX <= 2 && DistY <= 2)
 			{
-				TArray<AGridCell*> CelleAttaccoStatica = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
-				for (AGridCell* Cell : CelleAttaccoStatica) {
-					for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
-						if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
-							ExecuteAttack(ActiveAI, *UnitIt);
-							return;
+				bool bAltroAlleatoPresente = false;
+				for (TActorIterator<AUnitBase> Altro(GetWorld()); Altro; ++Altro)
+				{
+					if (Altro->ActorHasTag("EnemyUnit") && *Altro != ActiveAI)
+					{
+						int32 AltroDistX = FMath::Abs(Altro->GridX - (int32)It->GridPosition.X);
+						int32 AltroDistY = FMath::Abs(Altro->GridY - (int32)It->GridPosition.Y);
+						if (AltroDistX <= 2 && AltroDistY <= 2)
+						{
+							bAltroAlleatoPresente = true;
+							break;
 						}
 					}
 				}
 
-				ActiveAI->bHasMovedThisTurn = true;
-				SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
-				CheckEndTurn();
-				return;
+				if (!bAltroAlleatoPresente)
+				{
+					TArray<AGridCell*> CelleAttaccoStatica = GridMgr->GetAttackableCells(ActiveAI->GridX, ActiveAI->GridY, ActiveAI->AttackRange);
+					for (AGridCell* Cell : CelleAttaccoStatica) {
+						for (TActorIterator<AUnitBase> UnitIt(GetWorld()); UnitIt; ++UnitIt) {
+							if (UnitIt->ActorHasTag("PlayerUnit") && UnitIt->GridX == Cell->GridPosition.X && UnitIt->GridY == Cell->GridPosition.Y) {
+								ExecuteAttack(ActiveAI, *UnitIt);
+								return;
+							}
+						}
+					}
+
+					ActiveAI->bHasMovedThisTurn = true;
+					SetUnitColor(ActiveAI, FLinearColor(0.5f, 0.0f, 0.2f));
+					CheckEndTurn();
+					return;
+				}
 			}
 		}
 	}
@@ -674,19 +692,22 @@ void AMatchManager::EvaluateTowers()
 			Tower->CurrentState = ETowerState::Captured;
 			Tower->CurrentOwner = ETowerOwner::HumanPlayer;
 			Tower->UpdateVisuals(FLinearColor::Blue);
-			HumanTowersControlled++;
 		}
 		else if (AIUnitsInZone > 0) {
 			Tower->CurrentState = ETowerState::Captured;
 			Tower->CurrentOwner = ETowerOwner::AIPlayer;
 			Tower->UpdateVisuals(FLinearColor::Red);
-			AITowersControlled++;
 		}
 		else {
-			Tower->CurrentState = ETowerState::Neutral;
-			Tower->CurrentOwner = ETowerOwner::None;
-			Tower->UpdateVisuals(FLinearColor::Gray);
+			if (Tower->CurrentState == ETowerState::Contested) {
+				Tower->CurrentState = ETowerState::Neutral;
+				Tower->CurrentOwner = ETowerOwner::None;
+				Tower->UpdateVisuals(FLinearColor::Gray);
+			}
 		}
+
+		if (Tower->CurrentOwner == ETowerOwner::HumanPlayer) HumanTowersControlled++;
+		else if (Tower->CurrentOwner == ETowerOwner::AIPlayer) AITowersControlled++;
 	}
 
 	if (ActiveHUD)
