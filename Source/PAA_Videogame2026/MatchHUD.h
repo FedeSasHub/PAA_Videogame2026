@@ -37,7 +37,8 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	UTextBlock* TXT_VitaAIBrawler;
 	// ------------------------------------------------------
-
+	UPROPERTY(meta = (BindWidget))
+	class UTextBlock* TXT_MessaggioCentrale;
 	void AggiungiMossa(FString NuovaMossa);
 
 	// Funzioni per cambiare i testi da C++

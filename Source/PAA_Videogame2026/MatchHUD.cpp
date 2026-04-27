@@ -49,9 +49,21 @@ void UMatchHUD::AggiornaStatisticheGlobali(int32 VitaMS, int32 VitaMB, int32 Vit
 }
 void UMatchHUD::MostraMessaggioFinale(FString Messaggio, int32 SecondiRimanenti)
 {
+	// Aggiorniamo il testo del turno come countdown (piccolo in alto)
 	if (TURNO)
 	{
-		FString TestoCompleto = FString::Printf(TEXT("%s\nReset in %d..."), *Messaggio, SecondiRimanenti);
-		TURNO->SetText(FText::FromString(TestoCompleto));
+		FString TestoCountdown = FString::Printf(TEXT("Reset in %d..."), SecondiRimanenti);
+		TURNO->SetText(FText::FromString(TestoCountdown));
+	}
+
+	// Mostriamo il messaggio GIGANTE al centro
+	if (TXT_MessaggioCentrale)
+	{
+		TXT_MessaggioCentrale->SetText(FText::FromString(Messaggio));
+		TXT_MessaggioCentrale->SetVisibility(ESlateVisibility::Visible);
+
+		// Colore dinamico: Oro per vittoria, Rosso scuro per sconfitta
+		FLinearColor ColoreTesto = Messaggio.Contains(TEXT("VITTORIA")) ? FLinearColor(1.f, 0.8f, 0.1f) : FLinearColor(0.5f, 0.f, 0.f);
+		TXT_MessaggioCentrale->SetColorAndOpacity(FSlateColor(ColoreTesto));
 	}
 }
