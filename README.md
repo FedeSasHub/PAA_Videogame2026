@@ -39,6 +39,13 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 - **Meccanismo di Respawn**: Le unità sconfitte vengono rimosse e rigenerate istantaneamente nelle rispettive zone di schieramento iniziali con vita piena.
 - **Pathfinding**: L'AI calcola il costo di movimento in base all'elevazione (Costo 2 per la salita, 1 per piano/discesa).
 
+## Aggiunte o Modifiche rispetto alle Specifiche
+- **Nomenclatura Storico Mosse**: Per indicare il giocatore umano è stata scelta la sigla "TU" invece di "HP" (come suggerito nelle specifiche), poiché "HP" avrebbe generato confusione visiva e concettuale con l'acronimo dei Punti Vita (Health Points).
+- **Tasto "SALTA TURNO"**: Aggiunta la possibilità di terminare volontariamente il turno di un'unità senza dover per forza compiere un'azione offensiva o di movimento.
+- **Storico Mosse Migliorato**: Il log testuale è stato arricchito con formattazione a colori per distinguere intuitivamente a chi appartiene l'unità che ha agito. Inoltre, per facilitare la lettura, le mosse più recenti vengono inserite in cima alla lista (scalando le altre verso il basso).
+- **Reset Automatico**: Al termine della partita, il messaggio di vittoria o sconfitta è accompagnato da un timer di 10 secondi, concluso il quale il livello si riavvia automaticamente per una nuova sfida.
+- **Tutorial a Schermo**: Integrato un piccolo pannello visivo riassuntivo nell'HUD con i controlli base e la legenda dei colori per migliorare l'esperienza utente.
+
 ## Eventuali Problemi (Troubleshooting)
 In rari casi (circa 1 volta su 10), il sistema di Live Coding di Unreal Engine potrebbe non aggiornare correttamente la cache di tutti i file. In questi frangenti, nonostante appaia a schermo il messaggio di "Compilazione Completata" con successo, il gioco si avvia come se fosse stato compilato "a metà", ignorando alcune funzioni o saltando completamente alcune modifiche recenti ai file.
 Se si riscontra questo comportamento anomalo, è possibile risolvere forzando una ricompilazione pulita:
