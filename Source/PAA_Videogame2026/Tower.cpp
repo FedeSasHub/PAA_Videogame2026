@@ -3,6 +3,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "UObject/ConstructorHelpers.h"
 
+
 ATower::ATower()
 {
 	PrimaryActorTick.bCanEverTick = false;
@@ -28,11 +29,13 @@ ATower::ATower()
 	CurrentOwner = ETowerOwner::None;
 }
 
+// salva le coordinate della torre all'interno della griglia di gioco
 void ATower::SetupTower(int32 X, int32 Y)
 {
 	GridPosition = FVector2D(X, Y);
 }
 
+// aggiorna dinamicamente il colore della torre in base alla fazione che la controlla
 void ATower::UpdateVisuals(FLinearColor Color)
 {
 	if (!TowerMesh) return;
