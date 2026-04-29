@@ -7,10 +7,10 @@ Questo progetto è un gioco strategico a turni 1vs1 (Umano contro AI) sviluppato
 Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il relativo stato di implementazione:
 
 1.  **Compilazione e Struttura**: OK. Il progetto compila correttamente, il codice è strutturato con l'uso di ereditarietà e polimorfismo.
-2.  **Griglia di Gioco**: OK. Griglia 25x25 interamente visibile con visuale ortografica dall'alto.
+2.  **Griglia di Gioco**: OK. Griglia 25x25 interamente visibile con visuale dall'alto.
 3.  **Posizionamento Unità e Torri**: OK. Meccanismo di schieramento alternato e piazzamento simmetrico delle torri.
 4.  **AI con A-STAR**: OK. L'intelligenza artificiale utilizza l'algoritmo A* per il calcolo dei percorsi ottimali.
-5.  **Turni e Vittoria**: OK. Gestione dei turni alternati e condizioni di vittoria (controllo torri o eliminazione).
+5.  **Turni e Vittoria**: OK. Gestione dei turni alternati e condizioni di vittoria.
 6.  **Interfaccia Grafica (HUD)**: OK. Visualizzazione turni, HP delle unità e stato delle torri.
 7.  **Range di Movimento**: OK. Evidenziazione dinamica delle celle raggiungibili e dei bersagli a tiro.
 8.  **Danno da Contrattacco**: OK. Implementazione delle regole specifiche per il contrattacco tra Sniper e Brawler.
