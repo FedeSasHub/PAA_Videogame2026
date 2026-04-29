@@ -22,7 +22,6 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 ### Controlli
 - **Click Sinistro**: Seleziona un'unità alleata per vederne il raggio d'azione o una cella vuota per deselezionare.
 - **Click Destro**: Muovi l'unità selezionata o attacca un nemico nel raggio d'azione.
-- **Tasto "SALTA TURNO"**: Permette di terminare il turno dell'unità selezionata senza compiere azioni.
 
 ### Unità e Simboli
 - ■ **Brawler (Cubo)**: Alta vita (40 HP), attacco a corto raggio (1 cella), elevata mobilità.
@@ -33,18 +32,21 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 - **Rosso**: Area di attacco (bersagli nemici a tiro).
 - **Arancione**: Cella valida sia per il movimento che per l'attacco.
 
-## Dettagli Tecnici
+## Dettagli 
 - **Mappa Procedurale**: Generata tramite algoritmo **Perlin Noise** con seed randomico per garantire mappe diverse a ogni avvio. L'acqua (livello 0) funge da ostacolo al movimento.
 - **Sistema di Conquista**: Le torri vengono catturate per prossimità (area 5x5). Una torre è conquistata se presidiata da un solo giocatore, altrimenti entra in stato di "Contesa".
 - **Meccanismo di Respawn**: Le unità sconfitte vengono rimosse e rigenerate istantaneamente nelle rispettive zone di schieramento iniziali con vita piena.
 - **Pathfinding**: L'AI calcola il costo di movimento in base all'elevazione (Costo 2 per la salita, 1 per piano/discesa).
 
 ## Aggiunte o Modifiche rispetto alle Specifiche
+<<<<<<< HEAD
 - **Nomenclatura Storico Mosse**: Per indicare il giocatore umano è stata scelta la sigla "TU" invece di "HP" (come suggerito nelle specifiche), poiché "HP" avrebbe generato confusione visiva e concettuale con l'acronimo dei Punti Vita (Health Points).
 - **Tasto "SALTA TURNO"**: Aggiunta la possibilità di terminare volontariamente il turno di un'unità senza dover per forza compiere un'azione offensiva o di movimento.
 - **Storico Mosse Migliorato**: Il log testuale è stato arricchito con formattazione a colori per distinguere intuitivamente a chi appartiene l'unità che ha agito. Inoltre, per facilitare la lettura, le mosse più recenti vengono inserite in cima alla lista (scalando le altre verso il basso).
 - **Reset Automatico**: Al termine della partita, il messaggio di vittoria o sconfitta è accompagnato da un timer di 10 secondi, concluso il quale il livello si riavvia automaticamente per una nuova sfida.
 - **Tutorial a Schermo**: Integrato un piccolo pannello visivo riassuntivo nell'HUD con i controlli base e la legenda dei colori per migliorare l'esperienza utente.
+=======
+>>>>>>> 48fad438245fc3b5ae3437c4085db1b775b27ac6
 
 ## Eventuali Problemi (Troubleshooting)
 In rari casi (circa 1 volta su 10), il sistema di Live Coding di Unreal Engine potrebbe non aggiornare correttamente la cache di tutti i file. In questi frangenti, nonostante appaia a schermo il messaggio di "Compilazione Completata" con successo, il gioco si avvia come se fosse stato compilato "a metà", ignorando alcune funzioni o saltando completamente alcune modifiche recenti ai file.
