@@ -1,37 +1,53 @@
 #include "Tower.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "UObject/ConstructorHelpers.h"
 
-// inizializza il componente visivo della torre 
 ATower::ATower()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
 	TowerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TowerMesh"));
 	RootComponent = TowerMesh;
+
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderAsset(TEXT("/Engine/BasicShapes/Cylinder"));
+	if (CylinderAsset.Succeeded())
+	{
+		TowerMesh->SetStaticMesh(CylinderAsset.Object);
+	}
+
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DefaultMat(TEXT("/Engine/BasicShapes/BasicShapeMaterial"));
+	if (DefaultMat.Succeeded())
+	{
+		BaseTowerMaterial = DefaultMat.Object;
+	}
+
+	TowerMesh->SetRelativeScale3D(FVector(1.0f, 1.0f, 2.0f));
+
+	CurrentState = ETowerState::Neutral;
+	CurrentOwner = ETowerOwner::None;
 }
 
-// salva le coordinate della griglia all'interno della torre
 void ATower::SetupTower(int32 X, int32 Y)
 {
 	GridPosition = FVector2D(X, Y);
-	UE_LOG(LogTemp, Warning, TEXT("Tower placed at X:%d Y:%d"), X, Y);
 }
 
-// crea un'istanza dinamica del materiale per colorare la torre in base al proprietario (blu per il giocatore umano, rosso per l'IA, grigio quando è neutrale)
 void ATower::UpdateVisuals(FLinearColor Color)
 {
 	if (!TowerMesh) return;
 
-	UMaterialInterface* MatToUse = BaseTowerMaterial ? BaseTowerMaterial : TowerMesh->GetMaterial(0);
-
-	if (MatToUse)
+	if (!DynamicTowerMat)
 	{
-		UMaterialInstanceDynamic* DynamicMat = TowerMesh->CreateDynamicMaterialInstance(0, MatToUse);
-		if (DynamicMat)
+		UMaterialInterface* MatToUse = BaseTowerMaterial ? BaseTowerMaterial : TowerMesh->GetMaterial(0);
+		if (MatToUse)
 		{
-			DynamicMat->SetVectorParameterValue(FName("BodyColor"), Color);
-			TowerMesh->SetMaterial(0, DynamicMat);
+			DynamicTowerMat = TowerMesh->CreateDynamicMaterialInstance(0, MatToUse);
 		}
+	}
+
+	if (DynamicTowerMat)
+	{
+		DynamicTowerMat->SetVectorParameterValue(FName("BodyColor"), Color);
 	}
 }

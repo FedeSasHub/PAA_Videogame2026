@@ -18,21 +18,25 @@ class PAA_VIDEOGAME2026_API ATower : public AActor
 public:
 	ATower();
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tower")
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
 	UStaticMeshComponent* TowerMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tower")
+	UPROPERTY(EditAnywhere, Category = "Setup")
+	UMaterialInterface* BaseTowerMaterial;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	ETowerState CurrentState;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly)
+	ETowerOwner CurrentOwner;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector2D GridPosition;
-
-	UPROPERTY(VisibleAnywhere, Category = "Tower State")
-	ETowerState CurrentState = ETowerState::Neutral;
-
-	UPROPERTY(VisibleAnywhere, Category = "Tower State")
-	ETowerOwner CurrentOwner = ETowerOwner::None;
-
-	UPROPERTY(EditAnywhere, Category = "Setup | Aesthetics")
-	class UMaterialInterface* BaseTowerMaterial;
 
 	void SetupTower(int32 X, int32 Y);
 	void UpdateVisuals(FLinearColor Color);
+
+private:
+	UPROPERTY()
+	class UMaterialInstanceDynamic* DynamicTowerMat;
 };
