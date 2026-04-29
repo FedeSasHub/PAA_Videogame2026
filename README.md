@@ -11,7 +11,7 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 3.  **Posizionamento Unità e Torri**: OK. Meccanismo di schieramento alternato e piazzamento simmetrico delle torri.
 4.  **AI con A-STAR**: OK. L'intelligenza artificiale utilizza l'algoritmo A* per il calcolo dei percorsi ottimali.
 5.  **Turni e Vittoria**: OK. Gestione dei turni alternati e condizioni di vittoria.
-6.  **Interfaccia Grafica (HUD)**: OK. Visualizzazione turni, HP delle unità e stato delle torri.
+6.  **Interfaccia Grafica (HUD)**: OK*. Visualizzazione turni, HP delle unità e stato delle torri. Il codice per il coloramento delle torri in base a chi le possiede è implementato e funziona correttamente sul mio pc. Tuttavia, a volte scaricando il progetto da github le torri non si tingono del colore giusto. Presumibilmente è un problema di link dei materiali da c++ all'HUD.
 7.  **Range di Movimento**: OK. Evidenziazione dinamica delle celle raggiungibili e dei bersagli a tiro.
 8.  **Danno da Contrattacco**: OK. Implementazione delle regole specifiche per il contrattacco tra Sniper e Brawler.
 9.  **Storico Mosse**: OK. Lista testuale delle azioni eseguite durante la partita (formattata per fazione e unità).
