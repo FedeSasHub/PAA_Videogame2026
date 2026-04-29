@@ -10,7 +10,7 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 2.  **Griglia di Gioco**: OK. Griglia 25x25 interamente visibile con visuale dall'alto.
 3.  **Posizionamento Unità e Torri**: OK. Meccanismo di schieramento alternato e piazzamento simmetrico delle torri.
 4.  **AI con A-STAR**: OK. L'intelligenza artificiale utilizza l'algoritmo A* per il calcolo dei percorsi ottimali.
-5.  **Turni e Vittoria**: OK. Gestione dei turni alternati e condizioni di vittoria (controllo torri).
+5.  **Turni e Vittoria**: OK. Gestione dei turni alternati e condizioni di vittoria.
 6.  **Interfaccia Grafica (HUD)**: OK. Visualizzazione turni, HP delle unità e stato delle torri.
 7.  **Range di Movimento**: OK. Evidenziazione dinamica delle celle raggiungibili e dei bersagli a tiro.
 8.  **Danno da Contrattacco**: OK. Implementazione delle regole specifiche per il contrattacco tra Sniper e Brawler.
