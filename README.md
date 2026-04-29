@@ -42,7 +42,7 @@ Come richiesto dalle specifiche d'esame, di seguito la lista dei requisiti e il 
 - **Nomenclature log mosse**: Nello storico delle mosse, per indicare il giocatore umano è stata scelta la nomenclatura "TU". "HP" sarebbe stato confusionario dato che è la stessa sigla utilizzata per i punti vita.
 - **Tasto "SALTA TURNO"**: Permette di terminare il turno dell'unità selezionata senza compiere azioni.
 - **Log Mosse Colorato**: Permette di vedere in maniera intuitiva a chi appartiene l'unità che ha compiuto una determinata azione. Inoltre, le mosse più recenti vengono inserite in alto (scalando in basso le altre) per fare sì che siano sempre visibili.
-- **Reset automatico a fine partita**: Al termine di una partita, ad accompagnare il messaggio di vittoria o sconfittà vi sarà un timer di 10 secondi, dopo il quale inizierà in automatico una nuova partita.
+- **Reset automatico a fine partita**: Al termine di una partita, ad accompagnare il messaggio di vittoria o sconfittà vi è un timer di 10 secondi, dopo il quale inizia in automatico una nuova partita.
 - **Piccolo Tutorial a Schermo**
 
 ## Eventuali Problemi (Troubleshooting)
